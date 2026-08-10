@@ -69,6 +69,41 @@
   .res .rm{font-size:11.5px;color:var(--muted);display:flex;gap:7px;flex-wrap:wrap;margin-top:1px}
   .src{border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:10.5px}
 
+  /* ---- アプリ内ヘルプ ---- */
+  details.help{margin:0 0 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+  details.help summary{
+    cursor:pointer;padding:7px 11px;font-size:12px;color:var(--muted);
+    list-style:none;display:flex;align-items:center;gap:6px;user-select:none;
+  }
+  details.help summary::-webkit-details-marker{display:none}
+  details.help summary::before{content:'▸';transition:.15s;display:inline-block}
+  details.help[open] summary::before{transform:rotate(90deg)}
+  details.help summary:hover{color:var(--accent)}
+  .help-body{padding:2px 12px 11px;font-size:12px;border-top:1px solid var(--line)}
+  .h-lead{margin:11px 0 6px;font-weight:700;font-size:12px}
+  .h-tbl{width:100%;border-collapse:collapse}
+  .h-tbl th{
+    text-align:left;vertical-align:top;white-space:nowrap;font-weight:700;
+    padding:5px 10px 5px 0;color:var(--fg);border-top:1px solid var(--line);width:1%;
+  }
+  .h-tbl td{vertical-align:top;padding:5px 0;color:var(--muted);border-top:1px solid var(--line);line-height:1.7}
+  .h-tbl code{
+    background:var(--panel);border:1px solid var(--line);border-radius:4px;
+    padding:1px 5px;font-size:11px;word-break:break-all;
+  }
+  .h-note{display:block;color:var(--muted);font-size:11px;margin-top:3px;line-height:1.7}
+  p.h-note{margin:7px 0 0}
+
+  /* ---- リンク ---- */
+  .link-preview{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 10px}
+  .svc{
+    display:inline-flex;align-items:center;gap:4px;text-decoration:none;
+    border:1px solid var(--line);border-radius:7px;padding:2px 8px;font-size:11.5px;
+    color:var(--muted);background:var(--panel2);transition:.12s;
+  }
+  .svc:hover{border-color:var(--accent);color:var(--accent)}
+  .svc.info{opacity:.75;font-size:11px}
+
   /* ---- 入力フォーム ---- */
   form.card{
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
@@ -172,9 +207,47 @@
 <section class="import">
   <h2>🔎 データを取り込む</h2>
   <p class="hint">
-    タイトルを入れて検索するか、<b>URL / ID を貼り付け</b>ると直接読み込みます。<br>
-    対応：AniList・MyAnimeList・ja.wikipedia・Wikidata の URL、<code>Q21697406</code>、<code>anilist:154587</code>、<code>mal:52991</code>
+    タイトルを入れて検索するか、<b>URL / ID を貼り付け</b>ると直接読み込みます。
   </p>
+
+  <details class="help">
+    <summary>どの URL を貼れる？／どの URL が保存される？</summary>
+    <div class="help-body">
+      <p class="h-lead">① ここに<b>貼り付けられる</b> URL・ID</p>
+      <table class="h-tbl">
+        <tr><th>AniList</th>
+            <td><code>https://anilist.co/anime/154587</code><br><code>anilist:154587</code></td></tr>
+        <tr><th>MyAnimeList</th>
+            <td><code>https://myanimelist.net/anime/52991</code><br><code>mal:52991</code>
+                <span class="h-note">MAL の ID から AniList のデータを引き当てます</span></td></tr>
+        <tr><th>Wikipedia<br>(日本語版)</th>
+            <td><code>https://ja.wikipedia.org/wiki/君の名は。</code></td></tr>
+        <tr><th>Wikidata</th>
+            <td><code>https://www.wikidata.org/wiki/Q21697406</code><br><code>Q21697406</code></td></tr>
+      </table>
+      <p class="h-note">
+        上記以外の URL（公式サイト、Filmarks、Amazon、YouTube など）を貼っても読み込めません。
+        その場合はタイトルで検索してください。
+      </p>
+
+      <p class="h-lead">② 作品に<b>保存される</b> URL（3種類）</p>
+      <table class="h-tbl">
+        <tr><th>🔗 公式サイト</th>
+            <td>タイトルをクリックしたときに開くリンク。<br>
+                AniList の公式サイト欄、または Wikidata の「公式ウェブサイト」から入ります。
+                <span class="h-note">下の「公式サイト・参考URL」欄で自由に書き換えられます</span></td></tr>
+        <tr><th>▶ 配信</th>
+            <td>Netflix・Prime Video・U-NEXT・Hulu などの視聴ページ。取り込み時に分かったものだけ、最大4件。</td></tr>
+        <tr><th>ⓘ 取り込み元</th>
+            <td>AniList か Wikipedia の、その情報を取ってきたページ。<br>
+                「この日付どこ情報だっけ」を後から確かめるためのものです。</td></tr>
+      </table>
+      <p class="h-note">
+        公式サイトが未登録の作品では、タイトルのリンクは取り込み元のページに向きます。
+        手入力で追加した作品にはリンクは付きません（あとから「編集」で足せます）。
+      </p>
+    </div>
+  </details>
   <div class="row">
     <input type="text" id="imp-q" placeholder="例：葬送のフリーレン ／ https://anilist.co/anime/154587" autocomplete="off">
     <select id="imp-src" title="検索先">
@@ -249,6 +322,10 @@
 
   <div class="field"><label for="f-memo">メモ</label>
     <textarea id="f-memo" placeholder="感想、監督、録画予約済み など" rows="1"></textarea></div>
+
+  <div class="field"><label for="f-official">公式サイト・参考URL（任意）</label>
+    <input type="text" id="f-official" placeholder="例：https://frieren-anime.jp/" autocomplete="off" inputmode="url"></div>
+  <div id="linkPreview" class="link-preview" hidden></div>
 
   <div class="formfoot">
     <label class="star-toggle" id="starLabel">
@@ -384,7 +461,16 @@ function alQuery(query, variables){
 var AL_FIELDS = 'id idMal title{native romaji english} format episodes status ' +
   'startDate{year month day} endDate{year month day} siteUrl ' +
   'coverImage{medium} studios(isMain:true){nodes{name}} ' +
+  'externalLinks{site type language url} ' +
   'relations{edges{relationType node{id type format title{native romaji} startDate{year}}}}';
+
+// 配信サービスの表示優先度（日本で使えるものを前に）
+var SVC_ORDER = ['Netflix','Amazon Prime Video','U-NEXT','Hulu','Disney Plus','dアニメストア',
+                 'ABEMA','Abema TV','TVer','Crunchyroll','YouTube'];
+function svcRank(name){
+  var i = SVC_ORDER.indexOf(name);
+  return i < 0 ? SVC_ORDER.length : i;
+}
 
 function alSearch(term){
   var q = 'query($s:String){Page(perPage:8){media(search:$s,type:ANIME,sort:SEARCH_MATCH){'+AL_FIELDS+'}}}';
@@ -410,8 +496,19 @@ function alTitle(m){ return (m.title.native || m.title.romaji || m.title.english
 
 function toResultAL(m){
   var sd = m.startDate;
+  var ext = m.externalLinks || [];
+  var official = (ext.filter(function(l){
+    return l.type==='INFO' && /official/i.test(l.site) && l.language==='Japanese';
+  })[0] || ext.filter(function(l){
+    return l.type==='INFO' && /official/i.test(l.site);
+  })[0] || {}).url || '';
+  var streams = ext.filter(function(l){ return l.type==='STREAMING' && l.url; })
+    .sort(function(a,b){ return svcRank(a.site)-svcRank(b.site); })
+    .map(function(l){ return {label:l.site, url:l.url}; })
+    .slice(0,4);
   return {
     src:'anilist', srcLabel:'AniList', id:m.id,
+    official: official, links: streams,
     title: alTitle(m),
     cat: (m.format==='MOVIE') ? 'movie' : 'anime',
     format: m.format,
@@ -515,6 +612,12 @@ function snakIds(claims, prop){
     return v && v.value && v.value.id;
   }).filter(Boolean);
 }
+// 文字列そのものが値になるプロパティ（URL・外部ID）用
+function snakStr(claims, prop){
+  var st=(claims[prop]||[])[0];
+  var v=st && st.mainsnak.datavalue;
+  return (v && typeof v.value==='string') ? v.value : '';
+}
 function snakAmount(claims, prop){
   var st=(claims[prop]||[])[0];
   var v=st && st.mainsnak.datavalue;
@@ -557,9 +660,16 @@ function entitiesToResults(entities){
     var label=(e.labels && ((e.labels.ja&&e.labels.ja.value)||(e.labels.en&&e.labels.en.value))) || e.id;
     var wp=e.sitelinks && e.sitelinks.jawiki && e.sitelinks.jawiki.title;
 
+    var netflixId = snakStr(c,'P1874');
+    var huluId    = snakStr(c,'P6467');
+    var streams=[];
+    if(netflixId) streams.push({label:'Netflix', url:'https://www.netflix.com/title/'+netflixId});
+    if(huluId)    streams.push({label:'Hulu',    url:'https://www.hulu.com/watch/'+huluId});
+
     out.push({
       src:'wikidata', srcLabel:'Wikipedia', id:e.id,
       title: label,
+      official: snakStr(c,'P856'), links: streams,
       cat: isFilm ? 'movie' : (isAnimeTv ? 'anime' : 'tv'),
       format: isFilm ? 'MOVIE' : 'TV',
       exactJp: !!jp,
@@ -680,9 +790,11 @@ function showResults(res){
 }
 
 function applyResult(r, btn){
+  // 前に選んだ作品の値が残らないよう、取り込みが埋める欄はいったん空にする
+  $('f-seasons').value=''; $('f-seen').value=''; $('f-ch').value='';
   $('f-title').value=r.title;
   $('f-cat').value=r.cat;
-  if(r.date) $('f-date').value=r.date;
+  $('f-date').value=r.date || '';
   $('f-eps').value = r.episodes ? Math.round(r.episodes) : '';
   $('f-memo').value='';
 
@@ -731,10 +843,39 @@ function applyResult(r, btn){
     setStatus('「'+r.title+'」を読み込みました。');
   }
 
-  pendingSrc={url:r.url, ref:r.src+':'+r.id};
+  pendingSrc={url:r.url, ref:r.src+':'+r.id, links:r.links||[]};
+  $('f-official').value = r.official || '';
+  renderLinkPreview();
   $('f-title').focus();
 }
 var pendingSrc=null;
+
+/* フォームの下に「保存されるリンク」を出す */
+function renderLinkPreview(){
+  var box=$('linkPreview');
+  box.textContent='';
+  var links=(pendingSrc && pendingSrc.links) || [];
+  var srcUrl=pendingSrc && normUrl(pendingSrc.url);
+  var official=normUrl($('f-official').value);   // http/https 以外はリンクにしない
+  if(!links.length && !srcUrl && !official){ box.hidden=true; return; }
+  box.hidden=false;
+  function add(label, url, cls){
+    var a=document.createElement('a');
+    a.className='svc'+(cls?' '+cls:'');
+    a.href=url; a.target='_blank'; a.rel='noopener';
+    a.textContent=label;
+    box.appendChild(a);
+  }
+  if(official) add('🔗 公式サイト', official);
+  links.forEach(function(l){ add('▶ '+l.label, l.url); });
+  if(srcUrl) add('ⓘ '+srcName(pendingSrc.ref), srcUrl, 'info');
+}
+function srcName(ref){
+  if(!ref) return '取り込み元';
+  if(ref.indexOf('anilist')===0)  return 'AniList';
+  if(ref.indexOf('wikidata')===0) return 'Wikipedia';
+  return '取り込み元';
+}
 
 $('imp-go').addEventListener('click', runImport);
 $('imp-q').addEventListener('keydown', function(e){
@@ -767,13 +908,14 @@ function resetForm(){
   $('submitBtn').textContent='追加する';
   $('cancelBtn').hidden=true;
   $('editNote').hidden=true;
-  syncFormRows(); syncStarLabel();
+  syncFormRows(); syncStarLabel(); renderLinkPreview();
 }
 function startEdit(id){
   var it=items.find(function(x){ return x.id===id; });
   if(!it) return;
   editingId=id;
-  pendingSrc = it.url ? {url:it.url, ref:it.ref} : null;
+  pendingSrc = {url:it.url||'', ref:it.ref||'', links:it.links||[]};
+  $('f-official').value=it.official||'';
   $('f-title').value=it.title;
   $('f-cat').value=it.cat;
   $('f-status').value=it.status;
@@ -790,9 +932,19 @@ function startEdit(id){
   $('submitBtn').textContent='更新する';
   $('cancelBtn').hidden=false;
   $('editNote').hidden=false;
-  syncFormRows(); syncStarLabel();
+  syncFormRows(); syncStarLabel(); renderLinkPreview();
   window.scrollTo({top:$('form').offsetTop-10, behavior:'smooth'});
   $('f-title').focus();
+}
+// http/https のみ通す。javascript: などを弾き、スキームがなければ補う
+function normUrl(s){
+  s=String(s||'').trim();
+  if(!s) return '';
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(s)) s='https://'+s;
+  try{
+    var u=new URL(s);
+    return (u.protocol==='http:'||u.protocol==='https:') ? u.href : '';
+  }catch(e){ return ''; }
 }
 function numOrNull(id){
   var v=$(id).value.trim();
@@ -804,6 +956,7 @@ function numOrNull(id){
 $('f-cat').addEventListener('change', syncFormRows);
 $('f-status').addEventListener('change', syncFormRows);
 $('f-fav').addEventListener('change', syncStarLabel);
+$('f-official').addEventListener('input', renderLinkPreview);
 $('cancelBtn').addEventListener('click', function(){ resetForm(); setStatus(''); });
 
 $('form').addEventListener('submit', function(e){
@@ -824,6 +977,8 @@ $('form').addEventListener('submit', function(e){
     rate:    st==='done' ? (+$('f-rate').value||0) : 0,
     memo:  $('f-memo').value.trim(),
     fav:   $('f-fav').checked,
+    official: normUrl($('f-official').value),
+    links: (pendingSrc && pendingSrc.links) || [],
     url:   pendingSrc && pendingSrc.url  || '',
     ref:   pendingSrc && pendingSrc.ref  || ''
   };
@@ -917,10 +1072,13 @@ function makeItemEl(it){
 
   var title=document.createElement('div');
   title.className='title'+(it.status==='done'?' done':'');
-  if(it.url){
+  var official=normUrl(it.official), source=normUrl(it.url);
+  var head=official||source;
+  if(head){
     var a=document.createElement('a');
-    a.href=it.url; a.target='_blank'; a.rel='noopener';
-    a.textContent=it.title; a.title='取り込み元のページを開く';
+    a.href=head; a.target='_blank'; a.rel='noopener';
+    a.textContent=it.title;
+    a.title=official ? '公式サイトを開く' : '取り込み元のページを開く';
     title.appendChild(a);
   }else{
     title.textContent=it.title;
@@ -984,6 +1142,27 @@ function makeItemEl(it){
   if(it.memo){
     var m=document.createElement('div'); m.className='memo'; m.textContent=it.memo;
     body.appendChild(m);
+  }
+
+  // 配信サービス・取り込み元へのリンク
+  var links=(it.links||[]).filter(function(l){ return l && normUrl(l.url); });
+  if(links.length || source){
+    var lw=document.createElement('div'); lw.className='link-preview'; lw.style.margin='7px 0 0';
+    links.slice(0,4).forEach(function(l){
+      var a=document.createElement('a');
+      a.className='svc'; a.href=normUrl(l.url); a.target='_blank'; a.rel='noopener';
+      a.textContent='▶ '+l.label;
+      a.title=l.label+' で見る';
+      lw.appendChild(a);
+    });
+    if(source){
+      var s=document.createElement('a');
+      s.className='svc info'; s.href=source; s.target='_blank'; s.rel='noopener';
+      s.textContent='ⓘ '+srcName(it.ref);
+      s.title='この情報の取り込み元';
+      lw.appendChild(s);
+    }
+    body.appendChild(lw);
   }
   li.appendChild(body);
 
