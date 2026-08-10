@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>視聴リスト — アニメ・映画・地上波</title>
+<meta name="description" content="アニメ・映画・地上波番組を「お気に入り／放送予定／いつか見たい／見た」の4つで管理するメモアプリ">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a23; --panel2:#1e222d; --line:#2a2f3d;
+    --fg:#e8eaf0; --muted:#9aa2b5; --accent:#7c9cff; --accent2:#ffd166;
+    --ok:#5ad19a; --warn:#ff8f6b; --danger:#ff6b81;
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f6fb; --panel:#ffffff; --panel2:#f0f3fa; --line:#dfe4f0;
+      --fg:#1b1f2a; --muted:#5f6880; --accent:#3d63d8; --accent2:#c98a00;
+      --ok:#12a06a; --warn:#d9541f; --danger:#d63b52;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+    line-height:1.6;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:20px 16px 80px}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  h1{font-size:20px;margin:0;letter-spacing:.02em}
+  .sub{color:var(--muted);font-size:12px}
+  .tools{margin-left:auto;display:flex;gap:8px}
+
+  button,select,input,textarea{font-family:inherit;font-size:14px;color:var(--fg)}
+  .btn{
+    background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+    padding:7px 12px;border-radius:9px;cursor:pointer;transition:.15s;white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .btn.primary:hover{filter:brightness(1.1);color:#fff}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:4px 9px;font-size:12px;border-radius:7px}
+  .btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+  .btn[disabled]{opacity:.5;cursor:default;pointer-events:none}
+
+  /* ---- 取り込みバー ---- */
+  .import{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:13px;margin-bottom:14px;
+  }
+  .import h2{font-size:13px;margin:0 0 4px;display:flex;align-items:center;gap:7px}
+  .import .hint{font-size:11.5px;color:var(--muted);margin:0 0 9px}
+  .import .row{display:flex;gap:8px;flex-wrap:wrap}
+  .import input[type=text]{flex:1 1 240px}
+  .import select{flex:0 0 auto;width:auto}
+  #impStatus{font-size:12px;color:var(--muted);margin-top:8px;min-height:0}
+  #impStatus.err{color:var(--danger)}
+  .results{margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto}
+  .res{
+    display:flex;gap:10px;align-items:center;text-align:left;width:100%;
+    background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:8px 10px;cursor:pointer;transition:.12s;
+  }
+  .res:hover{border-color:var(--accent);transform:translateX(2px)}
+  .res img{width:34px;height:48px;object-fit:cover;border-radius:4px;flex:0 0 auto;background:var(--line)}
+  .res .rt{font-weight:700;font-size:13.5px;word-break:break-word}
+  .res .rm{font-size:11.5px;color:var(--muted);display:flex;gap:7px;flex-wrap:wrap;margin-top:1px}
+  .src{border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:10.5px}
+
+  /* ---- 入力フォーム ---- */
+  form.card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin-bottom:16px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row > *{flex:1 1 150px;min-width:0}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  .field label{font-size:11px;color:var(--muted);letter-spacing:.04em}
+  input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{
+    background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    padding:8px 10px;width:100%;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+  textarea{resize:vertical;min-height:44px}
+  .formfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .star-toggle{
+    display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+    background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;
+    user-select:none;font-size:13px;
+  }
+  .star-toggle input{display:none}
+  .star-toggle.on{border-color:var(--accent2);color:var(--accent2)}
+  #editNote{color:var(--accent2);font-size:12px;margin-left:auto}
+  fieldset.sub-block{
+    border:1px dashed var(--line);border-radius:10px;padding:10px 12px 2px;margin:0 0 10px;
+  }
+  fieldset.sub-block legend{font-size:11px;color:var(--muted);padding:0 6px}
+
+  /* ---- タブ ---- */
+  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .tab{
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:7px 14px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:7px;transition:.15s;
+  }
+  .tab:hover{border-color:var(--accent)}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .tab .count{background:rgba(127,127,127,.22);border-radius:999px;padding:0 7px;font-size:11px;min-width:20px;text-align:center}
+  .tab.active .count{background:rgba(255,255,255,.25)}
+
+  .filterbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .filterbar input[type=text]{flex:1 1 200px}
+  .filterbar select{flex:0 0 auto;width:auto}
+
+  /* ---- リスト ---- */
+  .group-head{font-size:11px;color:var(--muted);letter-spacing:.1em;margin:16px 0 8px;border-bottom:1px solid var(--line);padding-bottom:5px}
+  ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  li.item{
+    background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);
+    border-radius:var(--radius);padding:11px 13px;display:flex;gap:12px;align-items:flex-start;
+  }
+  li.item[data-cat=anime]{border-left-color:#8b7bff}
+  li.item[data-cat=movie]{border-left-color:#ff8f6b}
+  li.item[data-cat=tv]{border-left-color:#5ad19a}
+  li.item.aired{background:linear-gradient(90deg,rgba(255,143,107,.10),transparent 60%)}
+  .star{background:none;border:none;cursor:pointer;font-size:19px;line-height:1.3;color:var(--line);padding:0;transition:.15s}
+  .star:hover{transform:scale(1.15)}
+  .star.on{color:var(--accent2)}
+  .body{flex:1;min-width:0}
+  .title{font-weight:700;font-size:15px;word-break:break-word}
+  .title.done{color:var(--muted)}
+  .title a{color:inherit;text-decoration:none}
+  .title a:hover{text-decoration:underline;text-decoration-style:dotted}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted);margin-top:3px}
+  .badge{border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:11px}
+  .when{color:var(--accent);font-weight:700}
+  .soon{color:var(--warn);font-weight:700}
+  .memo{font-size:12.5px;color:var(--muted);margin-top:5px;white-space:pre-wrap;word-break:break-word}
+  .rate{color:var(--accent2);letter-spacing:1px}
+  .prog{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px}
+  .prog .bar{flex:0 1 130px;height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+  .prog .fill{height:100%;background:var(--accent);border-radius:99px;transition:width .25s}
+  .prog .fill.full{background:var(--ok)}
+  .prog .txt{color:var(--muted)}
+  .prog .txt b{color:var(--fg)}
+  .actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;flex:0 0 auto}
+  .empty{text-align:center;color:var(--muted);padding:44px 16px;border:1px dashed var(--line);border-radius:var(--radius);font-size:14px}
+  .empty .big{font-size:30px;display:block;margin-bottom:8px}
+  footer{margin-top:28px;font-size:11px;color:var(--muted);text-align:center;line-height:1.9}
+  footer a{color:var(--muted)}
+  @media(max-width:560px){
+    li.item{flex-wrap:wrap}
+    .actions{width:100%;justify-content:flex-start}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>📺 視聴リスト</h1>
+  <span class="sub">アニメ / 映画 / 地上波</span>
+  <div class="tools">
+    <button class="btn sm ghost" id="btnExport">書き出し</button>
+    <button class="btn sm ghost" id="btnImport">読み込み</button>
+    <input type="file" id="fileInput" accept="application/json" hidden>
+  </div>
+</header>
+
+<!-- ============ 取り込み ============ -->
+<section class="import">
+  <h2>🔎 データを取り込む</h2>
+  <p class="hint">
+    タイトルを入れて検索するか、<b>URL / ID を貼り付け</b>ると直接読み込みます。<br>
+    対応：AniList・MyAnimeList・ja.wikipedia・Wikidata の URL、<code>Q21697406</code>、<code>anilist:154587</code>、<code>mal:52991</code>
+  </p>
+  <div class="row">
+    <input type="text" id="imp-q" placeholder="例：葬送のフリーレン ／ https://anilist.co/anime/154587" autocomplete="off">
+    <select id="imp-src" title="検索先">
+      <option value="auto">両方から検索</option>
+      <option value="anime">アニメ (AniList)</option>
+      <option value="wiki">映画・番組 (Wikipedia)</option>
+    </select>
+    <button class="btn primary" id="imp-go">取り込む</button>
+  </div>
+  <div id="impStatus"></div>
+  <div class="results" id="impResults"></div>
+</section>
+
+<!-- ============ 入力フォーム ============ -->
+<form class="card" id="form">
+  <div class="row">
+    <div class="field" style="flex:3 1 260px">
+      <label for="f-title">タイトル <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="f-title" placeholder="例：君の名は。" autocomplete="off" required>
+    </div>
+    <div class="field">
+      <label for="f-cat">種類</label>
+      <select id="f-cat">
+        <option value="anime">アニメ</option>
+        <option value="movie">映画</option>
+        <option value="tv">地上波</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-status">リスト</label>
+      <select id="f-status">
+        <option value="sched">📅 放送予定（日付あり）</option>
+        <option value="someday">🕓 いつか見たい</option>
+        <option value="done">✅ もう見た</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="field"><label for="f-date" id="dateLabel">放送日</label><input type="date" id="f-date"></div>
+    <div class="field" id="timeField"><label for="f-time">開始時刻</label><input type="time" id="f-time"></div>
+    <div class="field" style="flex:2 1 200px"><label for="f-ch" id="chLabel">放送局・配信</label>
+      <input type="text" id="f-ch" placeholder="例：日テレ / Netflix" autocomplete="off"></div>
+  </div>
+
+  <!-- アニメ専用：期の管理 -->
+  <fieldset class="sub-block" id="animeBlock">
+    <legend>📀 シリーズの進み具合（アニメ）</legend>
+    <div class="row">
+      <div class="field"><label for="f-seasons">全何期</label>
+        <input type="number" id="f-seasons" min="0" max="99" step="1" placeholder="未定なら空欄"></div>
+      <div class="field"><label for="f-seen">何期まで見た</label>
+        <input type="number" id="f-seen" min="0" max="99" step="1" placeholder="0"></div>
+      <div class="field"><label for="f-eps">話数（任意）</label>
+        <input type="number" id="f-eps" min="0" max="9999" step="1" placeholder="例：28"></div>
+    </div>
+  </fieldset>
+
+  <div class="row" id="doneRow">
+    <div class="field"><label for="f-watched">見た日</label><input type="date" id="f-watched"></div>
+    <div class="field"><label for="f-rate">評価</label>
+      <select id="f-rate">
+        <option value="0">なし</option>
+        <option value="5">★★★★★</option>
+        <option value="4">★★★★☆</option>
+        <option value="3">★★★☆☆</option>
+        <option value="2">★★☆☆☆</option>
+        <option value="1">★☆☆☆☆</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field"><label for="f-memo">メモ</label>
+    <textarea id="f-memo" placeholder="感想、監督、録画予約済み など" rows="1"></textarea></div>
+
+  <div class="formfoot">
+    <label class="star-toggle" id="starLabel">
+      <input type="checkbox" id="f-fav"><span id="starIcon">☆</span> お気に入りに入れる
+    </label>
+    <button type="submit" class="btn primary" id="submitBtn">追加する</button>
+    <button type="button" class="btn ghost" id="cancelBtn" hidden>キャンセル</button>
+    <span id="editNote" hidden>編集中…</span>
+  </div>
+</form>
+
+<nav class="tabs" id="tabs"></nav>
+
+<div class="filterbar">
+  <input type="text" id="search" placeholder="🔍 タイトル・放送局・メモで絞り込み" autocomplete="off">
+  <select id="catFilter">
+    <option value="all">すべての種類</option>
+    <option value="anime">アニメ</option>
+    <option value="movie">映画</option>
+    <option value="tv">地上波</option>
+  </select>
+</div>
+
+<div id="listArea"></div>
+
+<footer>
+  データはこのブラウザ内（localStorage）にのみ保存されます。バックアップは「書き出し」から。<br>
+  取り込み元：<a href="https://anilist.co" target="_blank" rel="noopener">AniList</a> ／
+  <a href="https://ja.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>・<a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
+</footer>
+
+</div>
+
+<script>
+(function(){
+'use strict';
+
+var KEY = 'watchlist.v1';
+
+var CATS = {
+  anime: {label:'アニメ', icon:'🎬'},
+  movie: {label:'映画',   icon:'🍿'},
+  tv:    {label:'地上波', icon:'📡'}
+};
+var STATUS = {
+  sched:   {label:'放送予定',   icon:'📅'},
+  someday: {label:'いつか見たい', icon:'🕓'},
+  done:    {label:'見た',       icon:'✅'}
+};
+var TABS = [
+  {id:'fav',     icon:'⭐', label:'お気に入り'},
+  {id:'sched',   icon:'📅', label:'放送予定'},
+  {id:'someday', icon:'🕓', label:'いつか見たい'},
+  {id:'done',    icon:'✅', label:'見た'},
+  {id:'all',     icon:'📚', label:'すべて'}
+];
+
+var items = load();
+var tab = 'sched';
+var editingId = null;
+
+var $ = function(id){ return document.getElementById(id); };
+
+/* ================= 保存 ================= */
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    var arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  }catch(e){ return []; }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(items)); }
+  catch(e){ alert('保存できませんでした（ブラウザの保存領域が満杯かもしれません）'); }
+}
+
+/* ================= 日付 ================= */
+function today0(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
+function todayStr(){
+  var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function parseDate(s){
+  if(!s) return null;
+  var p=String(s).split('-');
+  if(p.length!==3) return null;
+  var d=new Date(+p[0], +p[1]-1, +p[2]);
+  return isNaN(d) ? null : d;
+}
+function daysUntil(s){
+  var d=parseDate(s);
+  return d ? Math.round((d-today0())/86400000) : null;
+}
+function fmtDate(s, withYear){
+  var d=parseDate(s);
+  if(!d) return '';
+  var w=['日','月','火','水','木','金','土'][d.getDay()];
+  return (withYear ? d.getFullYear()+'/' : '') + (d.getMonth()+1)+'/'+d.getDate()+'('+w+')';
+}
+function countdownText(n){
+  if(n===0) return '今日！';
+  if(n===1) return '明日';
+  if(n>1)   return 'あと'+n+'日';
+  return '公開・放送済み';
+}
+
+/* ================================================================
+   取り込み（外部データ）
+   - AniList GraphQL : アニメ。日本語タイトル・話数・放送開始日、
+                       PREQUEL/SEQUEL を辿って「全何期／これは何期目」を判定
+   - ja.wikipedia + Wikidata : 映画・テレビ番組。公開日(日本)・上映時間・監督・放送局
+   どちらも APIキー不要・CORS 対応なので、静的ページのまま動く
+   ================================================================ */
+
+var AL_URL = 'https://graphql.anilist.co';
+var TV_FORMATS = {TV:1, TV_SHORT:1};
+var alCache = {};
+
+function alQuery(query, variables){
+  return fetch(AL_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Accept':'application/json'},
+    body: JSON.stringify({query:query, variables:variables})
+  }).then(function(r){
+    if(!r.ok) throw new Error('AniList ' + r.status);
+    return r.json();
+  }).then(function(j){
+    if(j.errors && j.errors.length) throw new Error(j.errors[0].message);
+    return j.data;
+  });
+}
+
+var AL_FIELDS = 'id idMal title{native romaji english} format episodes status ' +
+  'startDate{year month day} endDate{year month day} siteUrl ' +
+  'coverImage{medium} studios(isMain:true){nodes{name}} ' +
+  'relations{edges{relationType node{id type format title{native romaji} startDate{year}}}}';
+
+function alSearch(term){
+  var q = 'query($s:String){Page(perPage:8){media(search:$s,type:ANIME,sort:SEARCH_MATCH){'+AL_FIELDS+'}}}';
+  return alQuery(q, {s:term}).then(function(d){
+    return (d.Page.media||[]).map(function(m){ alCache[m.id]=m; return toResultAL(m); });
+  });
+}
+function alById(id, isMal){
+  var q = 'query($id:Int){Media(' + (isMal?'idMal':'id') + ':$id,type:ANIME){'+AL_FIELDS+'}}';
+  return alQuery(q, {id:+id}).then(function(d){
+    if(!d.Media) throw new Error('見つかりませんでした');
+    alCache[d.Media.id]=d.Media;
+    return [toResultAL(d.Media)];
+  });
+}
+function alFetchNode(id){
+  if(alCache[id]) return Promise.resolve(alCache[id]);
+  var q = 'query($id:Int){Media(id:$id){'+AL_FIELDS+'}}';
+  return alQuery(q,{id:id}).then(function(d){ alCache[d.Media.id]=d.Media; return d.Media; });
+}
+
+function alTitle(m){ return (m.title.native || m.title.romaji || m.title.english || '(無題)'); }
+
+function toResultAL(m){
+  var sd = m.startDate;
+  return {
+    src:'anilist', srcLabel:'AniList', id:m.id,
+    title: alTitle(m),
+    cat: (m.format==='MOVIE') ? 'movie' : 'anime',
+    format: m.format,
+    year: sd && sd.year,
+    date: (sd && sd.year && sd.month) ?
+      sd.year+'-'+String(sd.month).padStart(2,'0')+'-'+String(sd.day||1).padStart(2,'0') : '',
+    episodes: m.episodes || '',
+    cover: m.coverImage && m.coverImage.medium,
+    url: m.siteUrl,
+    studio: m.studios && m.studios.nodes && m.studios.nodes[0] && m.studios.nodes[0].name,
+    sub: [m.format, m.episodes ? m.episodes+'話' : '', m.status==='RELEASING' ? '放送中' : '']
+          .filter(Boolean).join(' · ')
+  };
+}
+
+/* --- PREQUEL / SEQUEL を辿って期数を数える --- */
+function alSeasonChain(id){
+  return alFetchNode(id).then(function(start){
+    if(!TV_FORMATS[start.format]) return null;   // 劇場版・OVA は期の概念なし
+
+    function step(node, relType){
+      var edge = (node.relations && node.relations.edges || []).filter(function(e){
+        return e.relationType===relType && e.node.type==='ANIME' && TV_FORMATS[e.node.format];
+      })[0];
+      return edge ? edge.node.id : null;
+    }
+    function walk(fromId, relType, acc, depth){
+      if(depth<=0) return Promise.resolve(acc);
+      return alFetchNode(fromId).then(function(n){
+        var next = step(n, relType);
+        if(!next || acc.indexOf(next)>-1) return acc;
+        acc.push(next);
+        return walk(next, relType, acc, depth-1);
+      });
+    }
+    return walk(id,'PREQUEL',[],10).then(function(before){
+      return walk(id,'SEQUEL',[],10).then(function(after){
+        return { index: before.length + 1, total: before.length + 1 + after.length };
+      });
+    });
+  }).catch(function(){ return null; });
+}
+
+/* --------- Wikipedia(ja) + Wikidata --------- */
+var WD_API = 'https://www.wikidata.org/w/api.php';
+var WP_API = 'https://ja.wikipedia.org/w/api.php';
+
+// P31（分類）で映画かテレビ番組かを判定する
+var FILM_TYPES = {
+  Q11424:1, Q20650540:1, Q24862:1, Q506240:1, Q29168811:1, Q1261214:1,
+  Q93204:1, Q226730:1, Q842256:1, Q130232:1, Q319221:1, Q17517379:1, Q18011172:1
+};
+var TVSHOW_TYPES = {
+  Q5398426:1, Q15416:1, Q1259759:1, Q581714:1, Q63952888:1, Q117467246:1,
+  Q3464665:1, Q526877:1, Q23739:1, Q1366112:1
+};
+var Q_JAPAN = 'Q17';
+
+function jsonp(url){
+  return fetch(url).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  });
+}
+function wpSearch(term){
+  var u = WP_API+'?action=query&list=search&srsearch='+encodeURIComponent(term)+
+          '&srlimit=8&srnamespace=0&format=json&origin=*';
+  return jsonp(u).then(function(j){
+    return ((j.query&&j.query.search)||[]).map(function(x){ return x.title; });
+  });
+}
+function wdByJaTitles(titles){
+  if(!titles.length) return Promise.resolve([]);
+  var u = WD_API+'?action=wbgetentities&sites=jawiki&titles='+encodeURIComponent(titles.join('|'))+
+          '&props=claims|labels|sitelinks&languages=ja|en&sitefilter=jawiki&format=json&origin=*';
+  return jsonp(u).then(function(j){ return entitiesToResults(j.entities||{}); });
+}
+function wdByIds(ids){
+  var u = WD_API+'?action=wbgetentities&ids='+encodeURIComponent(ids.join('|'))+
+          '&props=claims|labels|sitelinks&languages=ja|en&sitefilter=jawiki&format=json&origin=*';
+  return jsonp(u).then(function(j){ return entitiesToResults(j.entities||{}); });
+}
+function wdLabels(ids){
+  ids = ids.filter(Boolean).slice(0,20);
+  if(!ids.length) return Promise.resolve({});
+  var u = WD_API+'?action=wbgetentities&ids='+encodeURIComponent(ids.join('|'))+
+          '&props=labels&languages=ja|en&format=json&origin=*';
+  return jsonp(u).then(function(j){
+    var out={};
+    Object.keys(j.entities||{}).forEach(function(k){
+      var l=j.entities[k].labels||{};
+      out[k]=(l.ja&&l.ja.value)||(l.en&&l.en.value)||k;
+    });
+    return out;
+  }).catch(function(){ return {}; });
+}
+
+function snakIds(claims, prop){
+  return (claims[prop]||[]).map(function(st){
+    var v=st.mainsnak.datavalue;
+    return v && v.value && v.value.id;
+  }).filter(Boolean);
+}
+function snakAmount(claims, prop){
+  var st=(claims[prop]||[])[0];
+  var v=st && st.mainsnak.datavalue;
+  return v ? parseFloat(v.value.amount!==undefined ? v.value.amount : v.value) : null;
+}
+function wdTime(st){
+  var v=st.mainsnak.datavalue;
+  if(!v || !v.value || !v.value.time) return null;
+  var t=v.value.time;                       // 例: +2016-08-26T00:00:00Z
+  var m=/^[+-](\d{4})-(\d{2})-(\d{2})/.exec(t);
+  if(!m) return null;
+  if(m[2]==='00') return null;              // 年のみの粗い値は日付として使わない
+  return m[1]+'-'+m[2]+'-'+(m[3]==='00' ? '01' : m[3]);
+}
+
+function entitiesToResults(entities){
+  var out=[];
+  Object.keys(entities).forEach(function(k){
+    var e=entities[k];
+    if(!e || !e.claims || e.missing!==undefined) return;
+    var c=e.claims;
+    var types=snakIds(c,'P31');
+    var isFilm=types.some(function(t){ return FILM_TYPES[t]; });
+    var isTv  =types.some(function(t){ return TVSHOW_TYPES[t]; });
+    var isAnimeTv = types.indexOf('Q63952888')>-1 || types.indexOf('Q117467246')>-1;
+    if(!isFilm && !isTv) return;
+
+    // 公開日：日本のものを最優先、なければ最も早いもの
+    var rel=(c.P577||[]).map(function(st){
+      var pl=st.qualifiers && st.qualifiers.P291 && st.qualifiers.P291[0].datavalue &&
+             st.qualifiers.P291[0].datavalue.value.id;
+      var co=st.qualifiers && st.qualifiers.P495 && st.qualifiers.P495[0].datavalue &&
+             st.qualifiers.P495[0].datavalue.value.id;
+      return {t:wdTime(st), jp:(pl===Q_JAPAN || co===Q_JAPAN)};
+    }).filter(function(x){ return x.t; });
+    var jp=rel.filter(function(x){ return x.jp; }).map(function(x){ return x.t; }).sort()[0];
+    var any=rel.map(function(x){ return x.t; }).sort()[0];
+    var date = jp || any || (isTv ? ((c.P580||[]).map(wdTime).filter(Boolean).sort()[0]) : '') || '';
+
+    var label=(e.labels && ((e.labels.ja&&e.labels.ja.value)||(e.labels.en&&e.labels.en.value))) || e.id;
+    var wp=e.sitelinks && e.sitelinks.jawiki && e.sitelinks.jawiki.title;
+
+    out.push({
+      src:'wikidata', srcLabel:'Wikipedia', id:e.id,
+      title: label,
+      cat: isFilm ? 'movie' : (isAnimeTv ? 'anime' : 'tv'),
+      format: isFilm ? 'MOVIE' : 'TV',
+      exactJp: !!jp,
+      date: date,
+      year: date ? +date.slice(0,4) : null,
+      runtime: snakAmount(c,'P2047'),
+      seasons: snakAmount(c,'P2437'),
+      episodes: snakAmount(c,'P1113') || '',
+      directorIds: snakIds(c,'P57'),
+      networkIds: snakIds(c,'P449'),
+      url: wp ? 'https://ja.wikipedia.org/wiki/'+encodeURIComponent(wp) : 'https://www.wikidata.org/wiki/'+e.id,
+      sub: [ isFilm?'映画':'テレビ', date ? date.slice(0,4)+(jp?'年 日本公開':'年') : '',
+             snakAmount(c,'P2047') ? snakAmount(c,'P2047')+'分' : '',
+             snakAmount(c,'P2437') ? '全'+snakAmount(c,'P2437')+'期' : '' ].filter(Boolean).join(' · ')
+    });
+  });
+  return out;
+}
+
+function wikiSearch(term){
+  return wpSearch(term).then(wdByJaTitles).then(function(res){
+    if(res.length) return res;
+    // 1回目で映画・番組が拾えなければ「映画」を足して再検索
+    return wpSearch(term+' 映画').then(wdByJaTitles);
+  });
+}
+
+/* --------- URL / ID の直接読み込み --------- */
+function parseRef(s){
+  s=s.trim();
+  var m;
+  if((m=/anilist\.co\/anime\/(\d+)/i.exec(s)))       return {kind:'anilist', id:m[1]};
+  if((m=/^anilist:(\d+)$/i.exec(s)))                  return {kind:'anilist', id:m[1]};
+  if((m=/myanimelist\.net\/anime\/(\d+)/i.exec(s)))   return {kind:'mal', id:m[1]};
+  if((m=/^mal:(\d+)$/i.exec(s)))                      return {kind:'mal', id:m[1]};
+  if((m=/wikidata\.org\/(?:wiki|entity)\/(Q\d+)/i.exec(s))) return {kind:'wikidata', id:m[1]};
+  if((m=/^(Q\d+)$/i.exec(s)))                         return {kind:'wikidata', id:m[1].toUpperCase()};
+  if((m=/ja\.(?:m\.)?wikipedia\.org\/wiki\/([^?#]+)/i.exec(s)))
+    return {kind:'jawiki', id:decodeURIComponent(m[1]).replace(/_/g,' ')};
+  return null;
+}
+
+/* --------- 取り込み UI --------- */
+function setStatus(msg, isErr){
+  var el=$('impStatus');
+  el.textContent=msg||'';
+  el.className=isErr?'err':'';
+}
+function clearResults(){ $('impResults').textContent=''; }
+
+function runImport(){
+  var term=$('imp-q').value.trim();
+  if(!term) return;
+  var src=$('imp-src').value;
+  clearResults();
+  $('imp-go').disabled=true;
+  setStatus('検索中…');
+
+  var ref=parseRef(term);
+  var p;
+  if(ref){
+    setStatus('リンクから読み込み中…');
+    if(ref.kind==='anilist')      p=alById(ref.id,false);
+    else if(ref.kind==='mal')     p=alById(ref.id,true);
+    else if(ref.kind==='wikidata')p=wdByIds([ref.id]);
+    else                          p=wdByJaTitles([ref.id]);
+  }else if(src==='anime'){
+    p=alSearch(term);
+  }else if(src==='wiki'){
+    p=wikiSearch(term);
+  }else{
+    p=Promise.all([
+      alSearch(term).catch(function(){ return []; }),
+      wikiSearch(term).catch(function(){ return []; })
+    ]).then(function(a){ return a[0].concat(a[1]); });
+  }
+
+  p.then(function(res){
+    $('imp-go').disabled=false;
+    if(!res || !res.length){
+      setStatus('見つかりませんでした。別の言い方（正式タイトル・英題）でも試してみてください。', true);
+      return;
+    }
+    setStatus(res.length+'件見つかりました。クリックすると下のフォームに入ります。');
+    showResults(res);
+  }).catch(function(err){
+    $('imp-go').disabled=false;
+    setStatus('取り込みに失敗しました（'+(err.message||err)+'）。オフラインの可能性があります。', true);
+  });
+}
+
+function showResults(res){
+  var box=$('impResults');
+  box.textContent='';
+  res.slice(0,16).forEach(function(r){
+    var b=document.createElement('button');
+    b.type='button'; b.className='res';
+    if(r.cover){
+      var img=document.createElement('img');
+      img.src=r.cover; img.alt=''; img.loading='lazy';
+      img.onerror=function(){ img.remove(); };
+      b.appendChild(img);
+    }
+    var d=document.createElement('div');
+    d.style.minWidth='0';
+    var t=document.createElement('div'); t.className='rt'; t.textContent=r.title;
+    var m=document.createElement('div'); m.className='rm';
+    var s=document.createElement('span'); s.className='src'; s.textContent=r.srcLabel;
+    m.appendChild(s);
+    var info=document.createElement('span');
+    info.textContent=[CATS[r.cat].icon+' '+CATS[r.cat].label, r.sub].filter(Boolean).join(' · ');
+    m.appendChild(info);
+    d.appendChild(t); d.appendChild(m);
+    b.appendChild(d);
+    b.addEventListener('click', function(){ applyResult(r, b); });
+    box.appendChild(b);
+  });
+}
+
+function applyResult(r, btn){
+  $('f-title').value=r.title;
+  $('f-cat').value=r.cat;
+  if(r.date) $('f-date').value=r.date;
+  $('f-eps').value = r.episodes ? Math.round(r.episodes) : '';
+  $('f-memo').value='';
+
+  // 未来の日付なら「放送予定」に、過去なら現在の選択を尊重
+  var n=daysUntil(r.date);
+  if(n!==null && n>=0 && !editingId) $('f-status').value='sched';
+
+  var notes=[];
+  if(r.runtime) notes.push('上映時間 '+Math.round(r.runtime)+'分');
+  if(r.studio)  notes.push('制作 '+r.studio);
+  if(r.date && r.cat==='movie') notes.push((r.exactJp?'日本公開 ':'公開 ')+r.date);
+
+  syncFormRows();
+  window.scrollTo({top:$('form').offsetTop-10, behavior:'smooth'});
+
+  // アニメなら期数を、Wikidata なら監督・放送局を追加で取得
+  if(r.src==='anilist' && r.cat==='anime'){
+    setStatus('「'+r.title+'」の期数を調べています…');
+    if(btn) btn.disabled=true;
+    alSeasonChain(r.id).then(function(chain){
+      if(btn) btn.disabled=false;
+      if(chain){
+        $('f-seasons').value=chain.total;
+        $('f-seen').value=Math.max(0, chain.index-1);
+        setStatus('「'+r.title+'」を読み込みました（全'+chain.total+'期のうち '+chain.index+'期目）。'+
+                  '見終わっている期の数を「何期まで見た」で直してください。');
+      }else{
+        setStatus('「'+r.title+'」を読み込みました。');
+      }
+      if(notes.length) $('f-memo').value=notes.join(' / ');
+      syncFormRows();
+    });
+  }else if(r.src==='wikidata'){
+    if(r.seasons) $('f-seasons').value=Math.round(r.seasons);
+    var need=(r.directorIds||[]).slice(0,2).concat((r.networkIds||[]).slice(0,2));
+    setStatus('「'+r.title+'」を読み込みました。');
+    wdLabels(need).then(function(map){
+      var dirs=(r.directorIds||[]).slice(0,2).map(function(i){ return map[i]; }).filter(Boolean);
+      var nets=(r.networkIds||[]).slice(0,2).map(function(i){ return map[i]; }).filter(Boolean);
+      if(dirs.length) notes.unshift('監督 '+dirs.join('・'));
+      if(nets.length && !$('f-ch').value) $('f-ch').value=nets.join('・');
+      if(notes.length) $('f-memo').value=notes.join(' / ');
+    });
+  }else{
+    if(notes.length) $('f-memo').value=notes.join(' / ');
+    setStatus('「'+r.title+'」を読み込みました。');
+  }
+
+  pendingSrc={url:r.url, ref:r.src+':'+r.id};
+  $('f-title').focus();
+}
+var pendingSrc=null;
+
+$('imp-go').addEventListener('click', runImport);
+$('imp-q').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ e.preventDefault(); runImport(); }
+});
+$('imp-src').addEventListener('change', function(){
+  if($('imp-q').value.trim()) runImport();
+});
+
+/* ================= フォーム ================= */
+function syncFormRows(){
+  var cat=$('f-cat').value, st=$('f-status').value;
+  $('dateLabel').textContent = cat==='movie' ? '公開日' : '放送日';
+  $('chLabel').textContent   = cat==='movie' ? '劇場・配信' : '放送局・配信';
+  $('f-ch').placeholder      = cat==='movie' ? '例：TOHOシネマズ / Netflix' : '例：日テレ / Netflix';
+  $('timeField').hidden      = (cat==='movie');
+  $('animeBlock').hidden     = (cat!=='anime');
+  $('doneRow').hidden        = (st!=='done');
+}
+function syncStarLabel(){
+  var on=$('f-fav').checked;
+  $('starLabel').classList.toggle('on', on);
+  $('starIcon').textContent = on ? '★' : '☆';
+}
+function resetForm(){
+  editingId=null; pendingSrc=null;
+  $('form').reset();
+  $('f-status').value = (tab==='fav'||tab==='all') ? 'sched' : tab;
+  $('f-rate').value='0';
+  $('submitBtn').textContent='追加する';
+  $('cancelBtn').hidden=true;
+  $('editNote').hidden=true;
+  syncFormRows(); syncStarLabel();
+}
+function startEdit(id){
+  var it=items.find(function(x){ return x.id===id; });
+  if(!it) return;
+  editingId=id;
+  pendingSrc = it.url ? {url:it.url, ref:it.ref} : null;
+  $('f-title').value=it.title;
+  $('f-cat').value=it.cat;
+  $('f-status').value=it.status;
+  $('f-date').value=it.date||'';
+  $('f-time').value=it.time||'';
+  $('f-ch').value=it.ch||'';
+  $('f-seasons').value=(it.seasons===0||it.seasons)?it.seasons:'';
+  $('f-seen').value=(it.seen===0||it.seen)?it.seen:'';
+  $('f-eps').value=it.eps||'';
+  $('f-watched').value=it.watched||'';
+  $('f-rate').value=String(it.rate||0);
+  $('f-memo').value=it.memo||'';
+  $('f-fav').checked=!!it.fav;
+  $('submitBtn').textContent='更新する';
+  $('cancelBtn').hidden=false;
+  $('editNote').hidden=false;
+  syncFormRows(); syncStarLabel();
+  window.scrollTo({top:$('form').offsetTop-10, behavior:'smooth'});
+  $('f-title').focus();
+}
+function numOrNull(id){
+  var v=$(id).value.trim();
+  if(v==='') return null;
+  var n=parseInt(v,10);
+  return isNaN(n) ? null : Math.max(0, n);
+}
+
+$('f-cat').addEventListener('change', syncFormRows);
+$('f-status').addEventListener('change', syncFormRows);
+$('f-fav').addEventListener('change', syncStarLabel);
+$('cancelBtn').addEventListener('click', function(){ resetForm(); setStatus(''); });
+
+$('form').addEventListener('submit', function(e){
+  e.preventDefault();
+  var title=$('f-title').value.trim();
+  if(!title) return;
+  var cat=$('f-cat').value, st=$('f-status').value;
+
+  var data={
+    title:title, cat:cat, status:st,
+    date:  $('f-date').value,
+    time:  cat==='movie' ? '' : $('f-time').value,
+    ch:    $('f-ch').value.trim(),
+    seasons: cat==='anime' ? numOrNull('f-seasons') : null,
+    seen:    cat==='anime' ? numOrNull('f-seen')    : null,
+    eps:     cat==='anime' ? numOrNull('f-eps')     : null,
+    watched: st==='done' ? $('f-watched').value : '',
+    rate:    st==='done' ? (+$('f-rate').value||0) : 0,
+    memo:  $('f-memo').value.trim(),
+    fav:   $('f-fav').checked,
+    url:   pendingSrc && pendingSrc.url  || '',
+    ref:   pendingSrc && pendingSrc.ref  || ''
+  };
+
+  if(editingId){
+    var it=items.find(function(x){ return x.id===editingId; });
+    if(it) Object.keys(data).forEach(function(k){ it[k]=data[k]; });
+  }else{
+    data.id='i'+Date.now()+Math.random().toString(36).slice(2,7);
+    data.created=Date.now();
+    items.push(data);
+    if(tab!=='all' && tab!=='fav' && tab!==data.status) tab=data.status;
+  }
+  save(); resetForm(); render();
+  setStatus('「'+title+'」を保存しました。');
+  $('imp-q').value=''; clearResults();
+});
+
+/* ================= 一覧 ================= */
+function visible(){
+  var q=$('search').value.trim().toLowerCase();
+  var cf=$('catFilter').value;
+  return items.filter(function(it){
+    if(tab==='fav'){ if(!it.fav) return false; }
+    else if(tab!=='all'){ if(it.status!==tab) return false; }
+    if(cf!=='all' && it.cat!==cf) return false;
+    if(q){
+      var hay=(it.title+' '+(it.ch||'')+' '+(it.memo||'')).toLowerCase();
+      if(hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+}
+function sortItems(arr){
+  return arr.slice().sort(function(a,b){
+    if(a.status==='sched' && b.status==='sched'){
+      if(a.date && b.date && a.date!==b.date) return a.date<b.date ? -1 : 1;
+      if(a.date && !b.date) return -1;
+      if(!a.date && b.date) return 1;
+      if(a.time && b.time && a.time!==b.time) return a.time<b.time ? -1 : 1;
+    }
+    if(a.status==='done' && b.status==='done'){
+      if(a.watched && b.watched && a.watched!==b.watched) return a.watched>b.watched ? -1 : 1;
+      if(a.watched && !b.watched) return -1;
+      if(!a.watched && b.watched) return 1;
+    }
+    return (b.created||0)-(a.created||0);
+  });
+}
+function renderTabs(){
+  var counts={
+    fav:     items.filter(function(i){ return i.fav; }).length,
+    sched:   items.filter(function(i){ return i.status==='sched'; }).length,
+    someday: items.filter(function(i){ return i.status==='someday'; }).length,
+    done:    items.filter(function(i){ return i.status==='done'; }).length,
+    all:     items.length
+  };
+  var nav=$('tabs'); nav.textContent='';
+  TABS.forEach(function(t){
+    var b=document.createElement('button');
+    b.type='button';
+    b.className='tab'+(tab===t.id?' active':'');
+    b.innerHTML='<span>'+t.icon+'</span><span>'+t.label+'</span><span class="count">'+counts[t.id]+'</span>';
+    b.addEventListener('click', function(){
+      tab=t.id;
+      if(!editingId){
+        $('f-status').value=(t.id==='fav'||t.id==='all')?'sched':t.id;
+        syncFormRows();
+      }
+      render();
+    });
+    nav.appendChild(b);
+  });
+}
+
+function makeItemEl(it){
+  var li=document.createElement('li');
+  li.className='item'; li.dataset.cat=it.cat;
+  var n = it.status==='sched' ? daysUntil(it.date) : null;
+  if(n!==null && n<0) li.classList.add('aired');
+
+  var star=document.createElement('button');
+  star.type='button';
+  star.className='star'+(it.fav?' on':'');
+  star.textContent=it.fav?'★':'☆';
+  star.title=it.fav?'お気に入りから外す':'お気に入りに入れる';
+  star.addEventListener('click', function(){ it.fav=!it.fav; save(); render(); });
+  li.appendChild(star);
+
+  var body=document.createElement('div'); body.className='body';
+
+  var title=document.createElement('div');
+  title.className='title'+(it.status==='done'?' done':'');
+  if(it.url){
+    var a=document.createElement('a');
+    a.href=it.url; a.target='_blank'; a.rel='noopener';
+    a.textContent=it.title; a.title='取り込み元のページを開く';
+    title.appendChild(a);
+  }else{
+    title.textContent=it.title;
+  }
+  body.appendChild(title);
+
+  var meta=document.createElement('div'); meta.className='meta';
+  function chip(text, cls){
+    if(!text) return;
+    var s=document.createElement('span');
+    s.className=cls||'badge'; s.textContent=text;
+    meta.appendChild(s);
+  }
+  chip(CATS[it.cat].icon+' '+CATS[it.cat].label);
+  if(tab==='fav'||tab==='all') chip(STATUS[it.status].icon+' '+STATUS[it.status].label);
+
+  if(it.date){
+    if(it.cat==='movie'){
+      chip('🎞 '+fmtDate(it.date,true)+' 公開', it.status==='sched'?'when':'badge');
+    }else{
+      chip(fmtDate(it.date, it.status!=='sched')+(it.time?' '+it.time:''), it.status==='sched'?'when':'badge');
+    }
+    if(it.status==='sched') chip(countdownText(n), (n!==null&&n<=1&&n>=0)?'soon':'badge');
+  }else if(it.status==='sched'){
+    chip('日付未定');
+  }
+  if(it.status==='done'){
+    if(it.watched) chip('👁 '+fmtDate(it.watched,true)+' 視聴');
+    if(it.rate) chip('★'.repeat(it.rate)+'☆'.repeat(5-it.rate), 'rate');
+  }
+  if(it.eps) chip('全'+it.eps+'話');
+  if(it.ch) chip('📺 '+it.ch);
+  body.appendChild(meta);
+
+  // アニメの期の進み具合
+  if(it.cat==='anime' && (it.seasons || it.seen)){
+    var seen=it.seen||0, total=it.seasons||0;
+    var p=document.createElement('div'); p.className='prog';
+    var bar=document.createElement('div'); bar.className='bar';
+    var fill=document.createElement('div');
+    var pct = total ? Math.min(100, Math.round(seen/total*100)) : (seen?100:0);
+    fill.className='fill'+(total && seen>=total ? ' full':'');
+    fill.style.width=pct+'%';
+    bar.appendChild(fill); p.appendChild(bar);
+    var txt=document.createElement('span'); txt.className='txt';
+    txt.innerHTML = total
+      ? '<b>'+seen+'期</b> / 全'+total+'期'+(seen>=total?' 🎉 制覇':'')
+      : '<b>'+seen+'期</b>まで視聴（全何期かは未定）';
+    p.appendChild(txt);
+    if(!total || seen<total){
+      var plus=document.createElement('button');
+      plus.type='button'; plus.className='btn sm ghost';
+      plus.textContent='+1期';
+      plus.title='見終わった期を1つ増やす';
+      plus.addEventListener('click', function(){ it.seen=(it.seen||0)+1; save(); render(); });
+      p.appendChild(plus);
+    }
+    body.appendChild(p);
+  }
+
+  if(it.memo){
+    var m=document.createElement('div'); m.className='memo'; m.textContent=it.memo;
+    body.appendChild(m);
+  }
+  li.appendChild(body);
+
+  var act=document.createElement('div'); act.className='actions';
+  function addBtn(label, cls, fn){
+    var b=document.createElement('button');
+    b.type='button'; b.className='btn sm '+(cls||'');
+    b.textContent=label;
+    b.addEventListener('click', fn);
+    act.appendChild(b);
+  }
+  if(it.status!=='done'){
+    addBtn('✅ 見た','',function(){
+      it.status='done';
+      it.watched=todayStr();
+      if(it.cat==='anime' && it.seasons) it.seen=it.seasons;
+      save(); render();
+    });
+  }else{
+    addBtn('🕓 また見たい','',function(){ it.status='someday'; save(); render(); });
+  }
+  if(it.status==='someday') addBtn('📅 放送予定へ','',function(){ it.status='sched'; save(); render(); });
+  addBtn('編集','ghost',function(){ startEdit(it.id); });
+  addBtn('削除','ghost danger',function(){
+    if(confirm('「'+it.title+'」を削除しますか？')){
+      items=items.filter(function(x){ return x.id!==it.id; });
+      if(editingId===it.id) resetForm();
+      save(); render();
+    }
+  });
+  li.appendChild(act);
+  return li;
+}
+
+function appendGroup(area, list, heading){
+  if(!list.length) return;
+  if(heading){
+    var h=document.createElement('div'); h.className='group-head';
+    h.textContent=heading; area.appendChild(h);
+  }
+  var ul=document.createElement('ul'); ul.className='list';
+  list.forEach(function(it){ ul.appendChild(makeItemEl(it)); });
+  area.appendChild(ul);
+}
+function renderList(){
+  var area=$('listArea'); area.textContent='';
+  var list=sortItems(visible());
+  if(!list.length){
+    var e=document.createElement('div'); e.className='empty';
+    e.innerHTML='<span class="big">🍿</span>'+
+      (items.length ? '該当するものがありません。' : 'まだ何もありません。上の「データを取り込む」か、フォームから追加してみてください。');
+    area.appendChild(e);
+    return;
+  }
+  if(tab==='sched'){
+    var past=list.filter(function(i){ var n=daysUntil(i.date); return n!==null && n<0; });
+    var soon=list.filter(function(i){ return past.indexOf(i)===-1; });
+    appendGroup(area, soon, null);
+    if(past.length) appendGroup(area, past, '公開・放送済み — 見たら ✅ を押して整理');
+  }else{
+    appendGroup(area, list, null);
+  }
+}
+function render(){ renderTabs(); renderList(); }
+
+$('search').addEventListener('input', renderList);
+$('catFilter').addEventListener('change', renderList);
+
+/* ================= 書き出し・読み込み ================= */
+$('btnExport').addEventListener('click', function(){
+  var blob=new Blob([JSON.stringify(items,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='watchlist-'+todayStr()+'.json';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); },1000);
+});
+$('btnImport').addEventListener('click', function(){ $('fileInput').click(); });
+$('fileInput').addEventListener('change', function(e){
+  var f=e.target.files[0];
+  if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var data=JSON.parse(r.result);
+      if(!Array.isArray(data)) throw 0;
+      if(items.length && !confirm('現在の'+items.length+'件に読み込んだ分を追加します。よろしいですか？')) return;
+      var seen={}; items.forEach(function(i){ seen[i.id]=1; });
+      data.forEach(function(d){
+        if(!d || !d.title) return;
+        if(!d.id || seen[d.id]) d.id='i'+Date.now()+Math.random().toString(36).slice(2,7);
+        if(!STATUS[d.status]) d.status='someday';
+        if(!CATS[d.cat]) d.cat='anime';
+        if(!d.created) d.created=Date.now();
+        items.push(d);
+      });
+      save(); render();
+    }catch(err){ alert('ファイルを読み込めませんでした。'); }
+    e.target.value='';
+  };
+  r.readAsText(f);
+});
+
+/* ================= 起動 ================= */
+resetForm();
+render();
+})();
+</script>
+</body>
+</html>
