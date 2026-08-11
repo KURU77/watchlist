@@ -54,8 +54,8 @@
 | | 内容 | 取得元 |
 |---|---|---|
 | 🔗 公式サイト | タイトルをクリックすると開く | AniList の公式サイト欄 / Wikidata の `P856` |
-| ▶ 配信 | Netflix・Prime Video・Hulu などの視聴ページ（最大4件） | AniList の `externalLinks` / Wikidata の `P1874` `P6467` |
-| ⓘ 取り込み元 | 情報を取ってきた AniList・Wikipedia のページ | — |
+| ▶ 配信 | Netflix・Prime Video・Hulu などの視聴ページ（最大3件） | AniList の `externalLinks` / Wikidata の `P1874` `P6467` |
+| ⓘ 取り込み元 | 情報を取ってきた AniList・Wikipedia のページ（メタ情報の末尾に小さく表示） | — |
 
 公式サイトはフォームの「公式サイト・参考URL」欄で自由に書き換えられます。
 手入力で追加した作品もここに URL を入れればリンクが付きます（`http` / `https` のみ）。

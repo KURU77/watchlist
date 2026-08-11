@@ -103,6 +103,8 @@
   }
   .svc:hover{border-color:var(--accent);color:var(--accent)}
   .svc.info{opacity:.75;font-size:11px}
+  .meta .srclink{color:var(--muted);opacity:.7;font-size:10.5px;text-decoration:none;border-bottom:1px dotted var(--line)}
+  .meta .srclink:hover{color:var(--accent);opacity:1;border-bottom-color:var(--accent)}
 
   /* ---- 入力フォーム ---- */
   form.card{
@@ -237,9 +239,9 @@
                 AniList の公式サイト欄、または Wikidata の「公式ウェブサイト」から入ります。
                 <span class="h-note">下の「公式サイト・参考URL」欄で自由に書き換えられます</span></td></tr>
         <tr><th>▶ 配信</th>
-            <td>Netflix・Prime Video・U-NEXT・Hulu などの視聴ページ。取り込み時に分かったものだけ、最大4件。</td></tr>
+            <td>Netflix・Prime Video・U-NEXT・Hulu などの視聴ページ。取り込み時に分かったものだけ、最大3件。</td></tr>
         <tr><th>ⓘ 取り込み元</th>
-            <td>AniList か Wikipedia の、その情報を取ってきたページ。<br>
+            <td>AniList か Wikipedia の、その情報を取ってきたページ。種類や放送日の右隣に小さく出ます。<br>
                 「この日付どこ情報だっけ」を後から確かめるためのものです。</td></tr>
       </table>
       <p class="h-note">
@@ -505,7 +507,7 @@ function toResultAL(m){
   var streams = ext.filter(function(l){ return l.type==='STREAMING' && l.url; })
     .sort(function(a,b){ return svcRank(a.site)-svcRank(b.site); })
     .map(function(l){ return {label:l.site, url:l.url}; })
-    .slice(0,4);
+    .slice(0,3);
   return {
     src:'anilist', srcLabel:'AniList', id:m.id,
     official: official, links: streams,
@@ -1111,6 +1113,13 @@ function makeItemEl(it){
   }
   if(it.eps) chip('全'+it.eps+'話');
   if(it.ch) chip('📺 '+it.ch);
+  if(source){                      // メタ情報の末尾に取り込み元
+    var sl=document.createElement('a');
+    sl.className='srclink'; sl.href=source; sl.target='_blank'; sl.rel='noopener';
+    sl.textContent='ⓘ '+srcName(it.ref);
+    sl.title='この情報の取り込み元';
+    meta.appendChild(sl);
+  }
   body.appendChild(meta);
 
   // アニメの期の進み具合
@@ -1144,24 +1153,17 @@ function makeItemEl(it){
     body.appendChild(m);
   }
 
-  // 配信サービス・取り込み元へのリンク
+  // 配信サービスへのボタン（最大3件）
   var links=(it.links||[]).filter(function(l){ return l && normUrl(l.url); });
-  if(links.length || source){
+  if(links.length){
     var lw=document.createElement('div'); lw.className='link-preview'; lw.style.margin='7px 0 0';
-    links.slice(0,4).forEach(function(l){
+    links.slice(0,3).forEach(function(l){
       var a=document.createElement('a');
       a.className='svc'; a.href=normUrl(l.url); a.target='_blank'; a.rel='noopener';
       a.textContent='▶ '+l.label;
       a.title=l.label+' で見る';
       lw.appendChild(a);
     });
-    if(source){
-      var s=document.createElement('a');
-      s.className='svc info'; s.href=source; s.target='_blank'; s.rel='noopener';
-      s.textContent='ⓘ '+srcName(it.ref);
-      s.title='この情報の取り込み元';
-      lw.appendChild(s);
-    }
     body.appendChild(lw);
   }
   li.appendChild(body);
