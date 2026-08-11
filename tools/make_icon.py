@@ -100,8 +100,13 @@ def sc(v, k):
     return v * k
 
 
-def render(px_size, content_scale=1.0, rounded=True):
-    """アイコンを1枚描く。content_scale<1 で内容を小さくする（maskable 用）"""
+def render(px_size, content_scale=1.0, rounded=True, parts=None):
+    """アイコンを1枚描く。
+
+    content_scale<1 で内容を小さくする（maskable 用）。
+    parts に 'fg' を渡すと絵柄だけ（背景は透明）、'bg' を渡すと下地だけを返す。
+    Android のアダプティブアイコン（前景と背景が別レイヤー）で使う。
+    """
     n = px_size * SS
     k = n / float(S)
 
@@ -175,7 +180,12 @@ def render(px_size, content_scale=1.0, rounded=True):
                (0, 0), stm)
     layer = Image.alpha_composite(layer, star)
 
-    img = Image.alpha_composite(tile, layer)
+    if parts == "fg":
+        img = layer                                   # 絵柄だけ（背景は透明）
+    elif parts == "bg":
+        img = tile                                    # 下地だけ
+    else:
+        img = Image.alpha_composite(tile, layer)
     return img.resize((px_size, px_size), Image.LANCZOS)
 
 

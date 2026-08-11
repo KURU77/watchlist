@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>視聴リスト — アニメ・映画・地上波</title>
 <meta name="description" content="アニメ・映画・地上波番組を「お気に入り／放送予定／いつか見たい／見た」の4つで管理するメモアプリ">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -28,7 +28,12 @@
     font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
     line-height:1.6;
   }
-  .wrap{max-width:980px;margin:0 auto;padding:20px 16px 80px}
+  /* アプリ版でノッチや下端のバーに文字が隠れないようにする */
+  .wrap{
+    max-width:980px;margin:0 auto;
+    padding:calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+            calc(80px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  }
   header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
   h1{font-size:20px;margin:0;letter-spacing:.02em;display:flex;align-items:center;gap:9px}
   .logo{
@@ -401,7 +406,8 @@
      target="_blank" rel="noopener" download="視聴リスト_使い方ガイド.pdf"><b>📄 使い方ガイド（PDF）</b></a><br>
   データはこのブラウザ内にのみ保存されます。バックアップは「書き出し」から。<br>
   取り込み元：<a href="https://anilist.co" target="_blank" rel="noopener">AniList</a> ／
-  <a href="https://ja.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>・<a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
+  <a href="https://ja.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>・<a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a><br>
+  <a href="privacy.html">プライバシーポリシー</a>
 </footer>
 
 </div>
@@ -1610,6 +1616,32 @@ $('fileInput').addEventListener('change', function(e){
   };
   r.readAsText(f);
 });
+
+/* ================= アプリ版（Capacitor）のための調整 ================= */
+var IS_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform &&
+                   window.Capacitor.isNativePlatform());
+var SITE = 'https://kuru77.github.io/watchlist/';
+
+if(IS_NATIVE){
+  // 外部リンクはアプリ内で開かず、端末のブラウザにわたす
+  document.addEventListener('click', function(ev){
+    var a=ev.target && ev.target.closest && ev.target.closest('a[href]');
+    if(!a) return;
+    var href=a.getAttribute('href')||'';
+    if(!/^https?:/i.test(href)) return;
+    ev.preventDefault();
+    var B=window.Capacitor.Plugins && window.Capacitor.Plugins.Browser;
+    if(B && B.open) B.open({url:href});
+    else window.open(href,'_blank');
+  }, true);
+
+  // 使い方ガイドの PDF は端末のブラウザで開く（WebView は PDF を表示できない）
+  var guide=document.querySelector('footer a[download]');
+  if(guide){
+    guide.removeAttribute('download');
+    guide.setAttribute('href', SITE+encodeURIComponent('視聴リスト_使い方ガイド.pdf'));
+  }
+}
 
 /* ================= 起動 ================= */
 renderSvcPicker();
