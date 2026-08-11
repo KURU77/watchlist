@@ -1,0 +1,20 @@
+{
+  "name": "視聴リスト — アニメ・映画・地上波",
+  "short_name": "視聴リスト",
+  "description": "アニメ・映画・地上波の番組を「お気に入り／放送予定／いつか見たい／見た」の4つで管理するメモアプリ",
+  "lang": "ja",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f7f9fd",
+  "theme_color": "#3b62d8",
+  "categories": ["entertainment", "productivity", "utilities"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
