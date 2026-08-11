@@ -54,8 +54,26 @@
 | | 内容 | 取得元 |
 |---|---|---|
 | 🔗 公式サイト | タイトルをクリックすると開く | AniList の公式サイト欄 / Wikidata の `P856` |
-| ▶ 配信 | Netflix・Prime Video・Hulu などの視聴ページ（最大3件） | AniList の `externalLinks` / Wikidata の `P1874` `P6467` |
+| ▶ 配信 | 視聴ページ。分からないものは 🔍 で作品名を検索 | 下表のとおり |
 | ⓘ 取り込み元 | 情報を取ってきた AniList・Wikipedia のページ（メタ情報の末尾に小さく表示） | — |
+
+### ▶ 対応している配信サービス
+
+ヘッダー下の「使っている配信サービスを選ぶ」で契約中のものを選ぶと、
+各作品にそのサービスのボタンが並びます。ひとつも選ばなければ、取り込みで分かった配信先だけが最大3件出ます。
+
+| サービス | 直リンクの取得元 | 取れないときの検索先 |
+|---|---|---|
+| Prime Video | AniList / Wikidata `P14440` | `amazon.co.jp`（Prime Video 内検索） |
+| Netflix | AniList / Wikidata `P1874` | `netflix.com/search` |
+| Hulu | （なし） | `hulu.jp/search` |
+| Disney+ | AniList / Wikidata `P7596` `P7595` | `disneyplus.com`（日本版） |
+| U-NEXT | Wikidata `P14567` | `video.unext.jp/freeword` |
+| TVer | Wikidata `P11595` | `tver.jp/search` |
+| NHK+ | Wikidata `P14741`（NHK ONE） | `plus.nhk.jp/search` |
+
+Hulu は日本版（hulu.jp）と海外版（hulu.com）で会社も配信作品も別のため、
+AniList や Wikidata が持っている hulu.com の ID は使わず、つねに hulu.jp の検索にしています。
 
 公式サイトはフォームの「公式サイト・参考URL」欄で自由に書き換えられます。
 手入力で追加した作品もここに URL を入れればリンクが付きます（`http` / `https` のみ）。

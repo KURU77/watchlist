@@ -103,6 +103,18 @@
   }
   .svc:hover{border-color:var(--accent);color:var(--accent)}
   .svc.info{opacity:.75;font-size:11px}
+  .svc.q{opacity:.6;border-style:dashed}
+  .svc-picker{display:flex;gap:7px;flex-wrap:wrap;margin:9px 0}
+  .svc-pick{
+    display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+    border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:12.5px;
+    background:var(--panel);transition:.12s;
+  }
+  .svc-pick:hover{border-color:var(--accent)}
+  .svc-pick input{display:none}
+  .svc-pick.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+  .svc-pick .tick{opacity:.35}
+  .svc-pick.on .tick{opacity:1}
   .meta .srclink{color:var(--muted);opacity:.7;font-size:10.5px;text-decoration:none;border-bottom:1px dotted var(--line)}
   .meta .srclink:hover{color:var(--accent);opacity:1;border-bottom-color:var(--accent)}
 
@@ -205,6 +217,21 @@
   </div>
 </header>
 
+<details class="help" id="svcPanel">
+  <summary>▶ 使っている配信サービスを選ぶ</summary>
+  <div class="help-body">
+    <p class="h-note" style="margin-top:8px">
+      選んだサービスが各作品にボタンとして並びます。
+      取り込みで視聴ページが分かっていれば <b>▶</b> で直接開き、分からないものは <b>🔍</b> で作品名を検索します。<br>
+      ひとつも選ばないときは、取り込みで分かった配信先だけを最大3件表示します。
+    </p>
+    <div class="svc-picker" id="svcPicker"></div>
+    <p class="h-note">
+      Hulu は日本版（hulu.jp）と海外版（hulu.com）で配信作品が別々のため、つねに hulu.jp の検索になります。
+    </p>
+  </div>
+</details>
+
 <!-- ============ 取り込み ============ -->
 <section class="import">
   <h2>🔎 データを取り込む</h2>
@@ -239,7 +266,9 @@
                 AniList の公式サイト欄、または Wikidata の「公式ウェブサイト」から入ります。
                 <span class="h-note">下の「公式サイト・参考URL」欄で自由に書き換えられます</span></td></tr>
         <tr><th>▶ 配信</th>
-            <td>Netflix・Prime Video・U-NEXT・Hulu などの視聴ページ。取り込み時に分かったものだけ、最大3件。</td></tr>
+            <td>Prime Video・Netflix・Hulu・Disney+・U-NEXT・TVer・NHK+ の7つに対応。<br>
+                視聴ページが分かったものは <b>▶</b> で直接開き、分からないものは <b>🔍</b> で作品名を検索します。
+                <span class="h-note">上の「使っている配信サービスを選ぶ」で、並べるサービスを決められます</span></td></tr>
         <tr><th>ⓘ 取り込み元</th>
             <td>AniList か Wikipedia の、その情報を取ってきたページ。種類や放送日の右隣に小さく出ます。<br>
                 「この日付どこ情報だっけ」を後から確かめるためのものです。</td></tr>
@@ -404,6 +433,62 @@ function save(){
   catch(e){ alert('保存できませんでした（ブラウザの保存領域が満杯かもしれません）'); }
 }
 
+/* ---- 使っている配信サービス ---- */
+var SKEY='watchlist.services.v1';
+var myServices = (function(){
+  try{
+    var a=JSON.parse(localStorage.getItem(SKEY)||'[]');
+    return Array.isArray(a) ? a : [];
+  }catch(e){ return []; }
+})();
+function saveServices(){
+  try{ localStorage.setItem(SKEY, JSON.stringify(myServices)); }catch(e){}
+}
+function renderSvcPicker(){
+  var box=$('svcPicker');
+  box.textContent='';
+  SERVICES.forEach(function(s){
+    var on=myServices.indexOf(s.key)>-1;
+    var l=document.createElement('label');
+    l.className='svc-pick'+(on?' on':'');
+    var cb=document.createElement('input');
+    cb.type='checkbox'; cb.checked=on; cb.value=s.key;
+    var tick=document.createElement('span');
+    tick.className='tick'; tick.textContent=on?'☑':'☐';
+    var txt=document.createElement('span'); txt.textContent=s.label;
+    l.appendChild(cb); l.appendChild(tick); l.appendChild(txt);
+    cb.addEventListener('change', function(){
+      var i=myServices.indexOf(s.key);
+      if(cb.checked && i<0) myServices.push(s.key);
+      if(!cb.checked && i>-1) myServices.splice(i,1);
+      saveServices(); renderSvcPicker(); renderList(); renderLinkPreview();
+    });
+    box.appendChild(l);
+  });
+}
+
+/* 作品カードに並べる配信ボタンを決める */
+function cardLinks(it){
+  var found={};
+  (it.links||[]).forEach(function(l){
+    if(l && l.key && normUrl(l.url)) found[l.key]=l;
+  });
+  var out=[];
+  if(!myServices.length){
+    // 未設定のときは、取り込みで分かった配信先だけ
+    SERVICES.forEach(function(s){
+      if(found[s.key]) out.push({label:s.label, url:normUrl(found[s.key].url), direct:true});
+    });
+    return out.slice(0,3);
+  }
+  SERVICES.forEach(function(s){
+    if(myServices.indexOf(s.key)<0) return;
+    if(found[s.key]) out.push({label:s.label, url:normUrl(found[s.key].url), direct:true});
+    else out.push({label:s.label, url:s.search+encodeURIComponent(it.title), direct:false});
+  });
+  return out;
+}
+
 /* ================= 日付 ================= */
 function today0(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
 function todayStr(){
@@ -466,13 +551,40 @@ var AL_FIELDS = 'id idMal title{native romaji english} format episodes status ' 
   'externalLinks{site type language url} ' +
   'relations{edges{relationType node{id type format title{native romaji} startDate{year}}}}';
 
-// 配信サービスの表示優先度（日本で使えるものを前に）
-var SVC_ORDER = ['Netflix','Amazon Prime Video','U-NEXT','Hulu','Disney Plus','dアニメストア',
-                 'ABEMA','Abema TV','TVer','Crunchyroll','YouTube'];
-function svcRank(name){
-  var i = SVC_ORDER.indexOf(name);
-  return i < 0 ? SVC_ORDER.length : i;
-}
+/* 対応する配信サービス（表示順）
+   al     : AniList の externalLinks に出てくるサービス名
+   wd     : Wikidata のプロパティと、そこから組み立てる URL
+   search : 直リンクが取れなかったときに使う、作品名での検索URL      */
+var SERVICES = [
+  {key:'prime',   label:'Prime Video',
+   al:['Amazon Prime Video'],
+   wd:[['P14440','https://www.primevideo.com/detail/$1']],
+   search:'https://www.amazon.co.jp/s?i=instant-video&k='},
+  {key:'netflix', label:'Netflix',
+   al:['Netflix'],
+   wd:[['P1874','https://www.netflix.com/title/$1']],
+   search:'https://www.netflix.com/search?q='},
+  {key:'hulu',    label:'Hulu',
+   al:[], wd:[],   // AniList/Wikidata の Hulu は米国版(hulu.com)なので使わない
+   search:'https://www.hulu.jp/search?q='},
+  {key:'disney',  label:'Disney+',
+   al:['Disney Plus'],
+   wd:[['P7596','https://www.disneyplus.com/series/wp/$1'],
+       ['P7595','https://www.disneyplus.com/movies/wd/$1']],
+   search:'https://www.disneyplus.com/ja-jp/search?q='},
+  {key:'unext',   label:'U-NEXT',
+   al:[],
+   wd:[['P14567','https://video.unext.jp/title/$1']],
+   search:'https://video.unext.jp/freeword?query='},
+  {key:'tver',    label:'TVer',
+   al:[],
+   wd:[['P11595','https://tver.jp/series/$1']],
+   search:'https://tver.jp/search?keyword='},
+  {key:'nhk',     label:'NHK+',
+   al:[],
+   wd:[['P14741','https://one.nhk/$1/']],
+   search:'https://plus.nhk.jp/search?keyword='}
+];
 
 function alSearch(term){
   var q = 'query($s:String){Page(perPage:8){media(search:$s,type:ANIME,sort:SEARCH_MATCH){'+AL_FIELDS+'}}}';
@@ -504,10 +616,14 @@ function toResultAL(m){
   })[0] || ext.filter(function(l){
     return l.type==='INFO' && /official/i.test(l.site);
   })[0] || {}).url || '';
-  var streams = ext.filter(function(l){ return l.type==='STREAMING' && l.url; })
-    .sort(function(a,b){ return svcRank(a.site)-svcRank(b.site); })
-    .map(function(l){ return {label:l.site, url:l.url}; })
-    .slice(0,3);
+  var streams = [];
+  SERVICES.forEach(function(s){
+    if(!s.al.length) return;
+    var hit = ext.filter(function(x){
+      return x.type==='STREAMING' && x.url && s.al.indexOf(x.site)>-1;
+    })[0];
+    if(hit) streams.push({key:s.key, label:s.label, url:hit.url});
+  });
   return {
     src:'anilist', srcLabel:'AniList', id:m.id,
     official: official, links: streams,
@@ -662,11 +778,17 @@ function entitiesToResults(entities){
     var label=(e.labels && ((e.labels.ja&&e.labels.ja.value)||(e.labels.en&&e.labels.en.value))) || e.id;
     var wp=e.sitelinks && e.sitelinks.jawiki && e.sitelinks.jawiki.title;
 
-    var netflixId = snakStr(c,'P1874');
-    var huluId    = snakStr(c,'P6467');
     var streams=[];
-    if(netflixId) streams.push({label:'Netflix', url:'https://www.netflix.com/title/'+netflixId});
-    if(huluId)    streams.push({label:'Hulu',    url:'https://www.hulu.com/watch/'+huluId});
+    SERVICES.forEach(function(s){
+      for(var i=0;i<(s.wd||[]).length;i++){
+        var id=snakStr(c, s.wd[i][0]);
+        if(id){
+          streams.push({key:s.key, label:s.label,
+                        url:s.wd[i][1].replace('$1', encodeURIComponent(id))});
+          break;
+        }
+      }
+    });
 
     out.push({
       src:'wikidata', srcLabel:'Wikipedia', id:e.id,
@@ -856,7 +978,8 @@ var pendingSrc=null;
 function renderLinkPreview(){
   var box=$('linkPreview');
   box.textContent='';
-  var links=(pendingSrc && pendingSrc.links) || [];
+  var title=$('f-title').value.trim();
+  var links=title ? cardLinks({title:title, links:(pendingSrc&&pendingSrc.links)||[]}) : [];
   var srcUrl=pendingSrc && normUrl(pendingSrc.url);
   var official=normUrl($('f-official').value);   // http/https 以外はリンクにしない
   if(!links.length && !srcUrl && !official){ box.hidden=true; return; }
@@ -869,7 +992,7 @@ function renderLinkPreview(){
     box.appendChild(a);
   }
   if(official) add('🔗 公式サイト', official);
-  links.forEach(function(l){ add('▶ '+l.label, l.url); });
+  links.forEach(function(l){ add((l.direct?'▶ ':'🔍 ')+l.label, l.url, l.direct?'':'q'); });
   if(srcUrl) add('ⓘ '+srcName(pendingSrc.ref), srcUrl, 'info');
 }
 function srcName(ref){
@@ -959,6 +1082,7 @@ $('f-cat').addEventListener('change', syncFormRows);
 $('f-status').addEventListener('change', syncFormRows);
 $('f-fav').addEventListener('change', syncStarLabel);
 $('f-official').addEventListener('input', renderLinkPreview);
+$('f-title').addEventListener('input', renderLinkPreview);   // 検索リンクは作品名で作るため
 $('cancelBtn').addEventListener('click', function(){ resetForm(); setStatus(''); });
 
 $('form').addEventListener('submit', function(e){
@@ -1153,15 +1277,17 @@ function makeItemEl(it){
     body.appendChild(m);
   }
 
-  // 配信サービスへのボタン（最大3件）
-  var links=(it.links||[]).filter(function(l){ return l && normUrl(l.url); });
+  // 配信サービスへのボタン
+  var links=cardLinks(it);
   if(links.length){
     var lw=document.createElement('div'); lw.className='link-preview'; lw.style.margin='7px 0 0';
-    links.slice(0,3).forEach(function(l){
+    links.forEach(function(l){
       var a=document.createElement('a');
-      a.className='svc'; a.href=normUrl(l.url); a.target='_blank'; a.rel='noopener';
-      a.textContent='▶ '+l.label;
-      a.title=l.label+' で見る';
+      a.className='svc'+(l.direct?'':' q');
+      a.href=l.url; a.target='_blank'; a.rel='noopener';
+      a.textContent=(l.direct?'▶ ':'🔍 ')+l.label;
+      a.title=l.direct ? l.label+' で見る'
+                       : l.label+' で「'+it.title+'」を検索する';
       lw.appendChild(a);
     });
     body.appendChild(lw);
@@ -1269,6 +1395,7 @@ $('fileInput').addEventListener('change', function(e){
 });
 
 /* ================= 起動 ================= */
+renderSvcPicker();
 resetForm();
 render();
 })();
