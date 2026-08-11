@@ -707,23 +707,76 @@ function jsonp(url){
     return r.json();
   });
 }
-function wpSearch(term){
-  var u = WP_API+'?action=query&list=search&srsearch='+encodeURIComponent(term)+
-          '&srlimit=8&srnamespace=0&format=json&origin=*';
-  return jsonp(u).then(function(j){
-    return ((j.query&&j.query.search)||[]).map(function(x){ return x.title; });
+/* --- 記事さがし ---
+   本文検索(list=search)だけだと、「国宝」「あんぱん」のような短い題名は
+   同じ語を含む別の記事に埋もれてしまう。
+   タイトル前方一致(prefixsearch)と、タイトル内検索(intitle:)を先に見る。 */
+function wpList(url, pick){
+  return jsonp(url).then(pick).catch(function(){ return []; });
+}
+function wpFindTitles(term){
+  var q = encodeURIComponent(term);
+  return Promise.all([
+    // タイトルの前方一致 —「国宝」→「国宝 (映画)」を拾う
+    wpList(WP_API+'?action=query&list=prefixsearch&pssearch='+q+
+           '&pslimit=10&format=json&origin=*',
+           function(j){ return ((j.query&&j.query.prefixsearch)||[]).map(function(x){ return x.title; }); }),
+    // タイトルに含まれるもの
+    wpList(WP_API+'?action=query&list=search&srsearch='+encodeURIComponent('intitle:'+term)+
+           '&srlimit=10&srnamespace=0&format=json&origin=*',
+           function(j){ return ((j.query&&j.query.search)||[]).map(function(x){ return x.title; }); }),
+    // 最後に本文検索
+    wpList(WP_API+'?action=query&list=search&srsearch='+q+
+           '&srlimit=8&srnamespace=0&format=json&origin=*',
+           function(j){ return ((j.query&&j.query.search)||[]).map(function(x){ return x.title; }); })
+  ]).then(function(lists){
+    var seen={}, out=[];
+    lists.forEach(function(l){
+      l.forEach(function(t){
+        if(!t || seen[t] || /一覧$|の登場人物|エピソード一覧/.test(t)) return;
+        seen[t]=1; out.push(t);
+      });
+    });
+    return out.slice(0, 14);
   });
 }
-function wdByJaTitles(titles){
+
+/* 記事タイトル → Wikidata の Q番号と冒頭文（リダイレクトもたどる） */
+function wpResolve(titles){
   if(!titles.length) return Promise.resolve([]);
-  var u = WD_API+'?action=wbgetentities&sites=jawiki&titles='+encodeURIComponent(titles.join('|'))+
-          '&props=claims|labels|sitelinks&languages=ja|en&sitefilter=jawiki&format=json&origin=*';
-  return jsonp(u).then(function(j){ return entitiesToResults(j.entities||{}); });
+  var u = WP_API+'?action=query&redirects=1&prop=pageprops|extracts'+
+          '&exintro=1&explaintext=1&exchars=320&exlimit=max'+
+          '&titles='+encodeURIComponent(titles.join('|'))+
+          '&format=json&formatversion=2&origin=*';
+  return jsonp(u).then(function(j){
+    var pages=(j.query&&j.query.pages)||[];
+    var order={};
+    titles.forEach(function(t,i){ order[t]=i; });
+    return pages.filter(function(p){ return !p.missing; }).map(function(p){
+      return {title:p.title, qid:(p.pageprops&&p.pageprops.wikibase_item)||'',
+              lead:(p.extract||''), rank:(order[p.title]===undefined ? 99 : order[p.title])};
+    }).sort(function(a,b){ return a.rank-b.rank; });
+  });
 }
-function wdByIds(ids){
-  var u = WD_API+'?action=wbgetentities&ids='+encodeURIComponent(ids.join('|'))+
-          '&props=claims|labels|sitelinks&languages=ja|en&sitefilter=jawiki&format=json&origin=*';
-  return jsonp(u).then(function(j){ return entitiesToResults(j.entities||{}); });
+
+/* Q番号でまとめて中身を取り、結果に組み立てる。
+   strict=false（URL を貼られたとき）は種類の判定に通らなくても返す */
+function wdEnrich(pages, strict){
+  var ids=pages.map(function(p){ return p.qid; }).filter(Boolean).slice(0,20);
+  var p = ids.length
+    ? jsonp(WD_API+'?action=wbgetentities&ids='+encodeURIComponent(ids.join('|'))+
+            '&props=claims|labels&languages=ja|en&format=json&origin=*')
+        .then(function(j){ return j.entities||{}; })
+        .catch(function(){ return {}; })
+    : Promise.resolve({});
+  return p.then(function(entities){
+    var out=[];
+    pages.forEach(function(page){
+      var r=buildWikiResult(page, entities[page.qid], strict);
+      if(r) out.push(r);
+    });
+    return out;
+  });
 }
 function wdLabels(ids){
   ids = ids.filter(Boolean).slice(0,20);
@@ -767,18 +820,48 @@ function wdTime(st){
   return m[1]+'-'+m[2]+'-'+(m[3]==='00' ? '01' : m[3]);
 }
 
-function entitiesToResults(entities){
-  var out=[];
-  Object.keys(entities).forEach(function(k){
-    var e=entities[k];
-    if(!e || !e.claims || e.missing!==undefined) return;
-    var c=e.claims;
-    var types=snakIds(c,'P31');
-    var isFilm=types.some(function(t){ return FILM_TYPES[t]; });
-    var isTv  =types.some(function(t){ return TVSHOW_TYPES[t]; });
-    var isAnimeTv = types.indexOf('Q63952888')>-1 || types.indexOf('Q117467246')>-1;
-    if(!isFilm && !isTv) return;
+/* Wikidata に分類が無い作品でも拾えるよう、記事名と冒頭文から種類を推測する */
+function guessKind(title, lead){
+  var t=title||'', l=lead||'';
+  if(/[（(](?:\d{4}年の)?(?:アニメ映画|映画)[）)]/.test(t)) return 'movie';
+  if(/[（(](?:\d{4}年の)?(?:テレビアニメ|アニメ)[）)]/.test(t)) return 'anime';
+  if(/[（(](?:\d{4}年の)?(?:テレビドラマ|ドラマ|テレビ番組|テレビシリーズ|特撮)[）)]/.test(t)) return 'tv';
+  if(/テレビアニメ|アニメシリーズ|アニメ作品/.test(l)) return 'anime';
+  if(/アニメ映画|劇場版|映画である|映画。|の映画|映画作品|公開された?の?映画|公開の日本映画/.test(l)) return 'movie';
+  if(/テレビドラマ|連続テレビ小説|大河ドラマ|配信ドラマ|テレビ番組|バラエティ番組|報道番組|放送された|放送中|放送予定/.test(l)) return 'tv';
+  return null;
+}
+/* 冒頭文から「2024年8月17日」のような日付を拾う（Wikidata に無いとき用） */
+function leadDate(lead){
+  var m=/(\d{4})年(?:（[^）]*）)?\s*(\d{1,2})月(\d{1,2})日/.exec(lead||'');
+  if(!m) return '';
+  return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+}
 
+function buildWikiResult(page, e, strict){
+  var c=(e && e.claims) || {};
+  var types=snakIds(c,'P31');
+  if(types.indexOf('Q5')>-1) return null;               // 人物の記事は除く
+  var isFilm=types.some(function(t){ return FILM_TYPES[t]; });
+  var isTv  =types.some(function(t){ return TVSHOW_TYPES[t]; });
+  var isAnimeTv = types.indexOf('Q63952888')>-1 || types.indexOf('Q117467246')>-1;
+
+  var cat;
+  if(isFilm) cat='movie';
+  else if(isTv) cat = isAnimeTv ? 'anime' : 'tv';
+  else if(types.length && strict){
+    // Wikidata が「これは映画賞・映画祭・人物などだ」と言っているので採らない
+    return null;
+  }
+  else {
+    cat = guessKind(page.title, page.lead);           // 分類が無い作品は記事から推測
+    if(!cat){
+      if(strict) return null;
+      cat='movie';                                     // URL を貼られたときは捨てない
+    }
+  }
+  isFilm = (cat==='movie');
+  {
     // 公開日：日本のものを最優先、なければ最も早いもの
     var rel=(c.P577||[]).map(function(st){
       var pl=st.qualifiers && st.qualifiers.P291 && st.qualifiers.P291[0].datavalue &&
@@ -789,10 +872,14 @@ function entitiesToResults(entities){
     }).filter(function(x){ return x.t; });
     var jp=rel.filter(function(x){ return x.jp; }).map(function(x){ return x.t; }).sort()[0];
     var any=rel.map(function(x){ return x.t; }).sort()[0];
-    var date = jp || any || (isTv ? ((c.P580||[]).map(wdTime).filter(Boolean).sort()[0]) : '') || '';
+    var date = jp || any
+             || (cat!=='movie' ? ((c.P580||[]).map(wdTime).filter(Boolean).sort()[0]) : '')
+             || leadDate(page.lead)             // Wikidata に日付が無ければ冒頭文から
+             || '';
 
-    var label=(e.labels && ((e.labels.ja&&e.labels.ja.value)||(e.labels.en&&e.labels.en.value))) || e.id;
-    var wp=e.sitelinks && e.sitelinks.jawiki && e.sitelinks.jawiki.title;
+    // 記事名の「(映画)」「(2025年のテレビドラマ)」などは題名ではないので外す
+    var label=(e && e.labels && ((e.labels.ja&&e.labels.ja.value)||(e.labels.en&&e.labels.en.value)))
+              || page.title.replace(/\s*[（(][^）)]*[）)]\s*$/, '');
 
     var streams=[];
     SERVICES.forEach(function(s){
@@ -806,11 +893,11 @@ function entitiesToResults(entities){
       }
     });
 
-    out.push({
-      src:'wikidata', srcLabel:'Wikipedia', id:e.id,
+    return {
+      src:'wikidata', srcLabel:'Wikipedia', id:(e && e.id) || page.title,
       title: label,
       official: snakStr(c,'P856'), links: streams,
-      cat: isFilm ? 'movie' : (isAnimeTv ? 'anime' : 'tv'),
+      cat: cat,
       format: isFilm ? 'MOVIE' : 'TV',
       exactJp: !!jp,
       date: date,
@@ -820,21 +907,51 @@ function entitiesToResults(entities){
       episodes: snakAmount(c,'P1113') || '',
       directorIds: snakIds(c,'P57'),
       networkIds: snakIds(c,'P449'),
-      url: wp ? 'https://ja.wikipedia.org/wiki/'+encodeURIComponent(wp) : 'https://www.wikidata.org/wiki/'+e.id,
-      sub: [ isFilm?'映画':'テレビ', date ? date.slice(0,4)+(jp?'年 日本公開':'年') : '',
+      url: 'https://ja.wikipedia.org/wiki/'+encodeURIComponent(page.title.replace(/ /g,'_')),
+      sub: [ isFilm?'映画':(cat==='anime'?'アニメ':'テレビ'),
+             date ? date.slice(0,4)+(jp?'年 日本公開':'年') : '',
              snakAmount(c,'P2047') ? snakAmount(c,'P2047')+'分' : '',
-             snakAmount(c,'P2437') ? '全'+snakAmount(c,'P2437')+'期' : '' ].filter(Boolean).join(' · ')
-    });
-  });
-  return out;
+             snakAmount(c,'P2437') ? '全'+snakAmount(c,'P2437')+'期' : '',
+             (e ? '' : 'Wikipediaのみ') ].filter(Boolean).join(' · ')
+    };
+  }
 }
 
 function wikiSearch(term){
-  return wpSearch(term).then(wdByJaTitles).then(function(res){
+  return wpFindTitles(term).then(wpResolve).then(function(pages){
+    return wdEnrich(pages, true);
+  }).then(function(res){
     if(res.length) return res;
-    // 1回目で映画・番組が拾えなければ「映画」を足して再検索
-    return wpSearch(term+' 映画').then(wdByJaTitles);
+    // それでも出なければ「映画」を足して本文検索
+    return wpList(WP_API+'?action=query&list=search&srsearch='+encodeURIComponent(term+' 映画')+
+                  '&srlimit=8&srnamespace=0&format=json&origin=*',
+                  function(j){ return ((j.query&&j.query.search)||[]).map(function(x){ return x.title; }); })
+      .then(wpResolve).then(function(pages){ return wdEnrich(pages, true); });
   });
+}
+/* ja.wikipedia の URL を貼られたとき（種類の判定に通らなくても取り込む） */
+function wikiByTitle(title){
+  return wpResolve([title]).then(function(pages){
+    if(!pages.length) throw new Error('その記事が見つかりませんでした');
+    return wdEnrich(pages, false);
+  });
+}
+/* Wikidata の URL / Q番号を貼られたとき */
+function wdByIds(ids){
+  return jsonp(WD_API+'?action=wbgetentities&ids='+encodeURIComponent(ids.join('|'))+
+               '&props=claims|labels|sitelinks&languages=ja|en&sitefilter=jawiki&format=json&origin=*')
+    .then(function(j){
+      var out=[];
+      Object.keys(j.entities||{}).forEach(function(k){
+        var e=j.entities[k];
+        if(!e || e.missing!==undefined) return;
+        var wp=e.sitelinks && e.sitelinks.jawiki && e.sitelinks.jawiki.title;
+        var r=buildWikiResult({title: wp || (e.labels&&e.labels.ja&&e.labels.ja.value) || k,
+                               qid:k, lead:''}, e, false);
+        if(r) out.push(r);
+      });
+      return out;
+    });
 }
 
 /* --------- URL / ID の直接読み込み --------- */
@@ -875,7 +992,7 @@ function runImport(){
     if(ref.kind==='anilist')      p=alById(ref.id,false);
     else if(ref.kind==='mal')     p=alById(ref.id,true);
     else if(ref.kind==='wikidata')p=wdByIds([ref.id]);
-    else                          p=wdByJaTitles([ref.id]);
+    else                          p=wikiByTitle(ref.id);
   }else if(src==='anime'){
     p=alSearch(term);
   }else if(src==='wiki'){
