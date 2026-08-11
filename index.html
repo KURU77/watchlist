@@ -7,18 +7,13 @@
 <meta name="description" content="アニメ・映画・地上波番組を「お気に入り／放送予定／いつか見たい／見た」の4つで管理するメモアプリ">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📺</text></svg>">
 <style>
+  /* 端末の設定にかかわらず、つねに明るい配色にする */
   :root{
-    --bg:#0f1117; --panel:#171a23; --panel2:#1e222d; --line:#2a2f3d;
-    --fg:#e8eaf0; --muted:#9aa2b5; --accent:#7c9cff; --accent2:#ffd166;
-    --ok:#5ad19a; --warn:#ff8f6b; --danger:#ff6b81;
+    color-scheme:light;
+    --bg:#f7f9fd; --panel:#ffffff; --panel2:#f4f7fd; --line:#e2e8f4;
+    --fg:#1c2230; --muted:#68718c; --accent:#3b62d8; --accent2:#c08300;
+    --ok:#0f9b68; --warn:#d4551f; --danger:#d43b52;
     --radius:14px;
-  }
-  @media (prefers-color-scheme: light){
-    :root{
-      --bg:#f4f6fb; --panel:#ffffff; --panel2:#f0f3fa; --line:#dfe4f0;
-      --fg:#1b1f2a; --muted:#5f6880; --accent:#3d63d8; --accent2:#c98a00;
-      --ok:#12a06a; --warn:#d9541f; --danger:#d63b52;
-    }
   }
   *{box-sizing:border-box}
   body{
@@ -32,7 +27,10 @@
   .sub{color:var(--muted);font-size:12px}
   .tools{margin-left:auto;display:flex;gap:8px}
 
-  button,select,input,textarea{font-family:inherit;font-size:14px;color:var(--fg)}
+  button{font-family:inherit;font-size:14px;color:var(--fg)}
+  /* iPhone の Safari は文字が 16px 未満の入力欄にふれると画面を勝手に拡大するため、
+     入力欄はどれも 16px を下回らせない */
+  input,select,textarea{font-family:inherit;font-size:16px;color:var(--fg)}
   .btn{
     background:var(--panel2);border:1px solid var(--line);color:var(--fg);
     padding:7px 12px;border-radius:9px;cursor:pointer;transition:.15s;white-space:nowrap;
@@ -129,8 +127,10 @@
   .field label{font-size:11px;color:var(--muted);letter-spacing:.04em}
   input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{
     background:var(--panel2);border:1px solid var(--line);border-radius:9px;
-    padding:8px 10px;width:100%;
+    padding:8px 10px;width:100%;min-width:0;max-width:100%;
   }
+  /* iOS は日付・時刻の入力欄に大きめの最小幅を持たせるため、明示的に縮められるようにする */
+  input[type=date],input[type=time],input[type=number]{-webkit-appearance:none;appearance:none}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
   textarea{resize:vertical;min-height:44px}
   .formfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
@@ -383,7 +383,9 @@
 <div id="listArea"></div>
 
 <footer>
-  データはこのブラウザ内（localStorage）にのみ保存されます。バックアップは「書き出し」から。<br>
+  <a href="%E8%A6%96%E8%81%B4%E3%83%AA%E3%82%B9%E3%83%88_%E4%BD%BF%E3%81%84%E6%96%B9%E3%82%AC%E3%82%A4%E3%83%89.pdf"
+     target="_blank" rel="noopener" download="視聴リスト_使い方ガイド.pdf"><b>📄 使い方ガイド（PDF）</b></a><br>
+  データはこのブラウザ内にのみ保存されます。バックアップは「書き出し」から。<br>
   取り込み元：<a href="https://anilist.co" target="_blank" rel="noopener">AniList</a> ／
   <a href="https://ja.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>・<a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
 </footer>
