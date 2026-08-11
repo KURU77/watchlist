@@ -62,7 +62,7 @@ Wikidata に分類（P31）が無い新しい作品は、記事名の「(映画)
 
 | | 内容 | 取得元 |
 |---|---|---|
-| 🔗 公式サイト | タイトルをクリックすると開く | AniList の公式サイト欄 / Wikidata の `P856` |
+| 🔗 公式サイト | タイトルをクリックすると開く | AniList の公式サイト欄 / Wikidata の `P856`（海外スタジオ版なら日本版に差し替え） |
 | ▶ 配信 | 視聴ページ。分からないものは 🔍 で作品名を検索 | 下表のとおり |
 | ⓘ 取り込み元 | 情報を取ってきた AniList・Wikipedia のページ（メタ情報の末尾に小さく表示） | — |
 
@@ -83,6 +83,26 @@ Wikidata に分類（P31）が無い新しい作品は、記事名の「(映画)
 
 Hulu は日本版（hulu.jp）と海外版（hulu.com）で会社も配信作品も別のため、
 AniList や Wikidata が持っている hulu.com の ID は使わず、つねに hulu.jp の検索にしています。
+
+#### 公式サイトの日本版への差し替え
+
+Wikidata の `P856` は海外スタジオの総合ページを指していることが多いため
+（例：ヴェノム → `sonypictures.com`）、同じスタジオの日本サイトが
+Wikipedia の外部リンクにあればそちらを使います。
+
+| 作品 | `P856` の値 | 実際に入る値 |
+|---|---|---|
+| ヴェノム | `sonypictures.com/movies/venom` | `bd-dvd.sonypictures.jp/venom/` |
+| スパイダーマン：アクロス・ザ・スパイダーバース | `sonypictures.com/movies/...` | `sonypictures.jp/he/11022640` |
+| 国宝 | `kokuhou-movie.com` | `kokuhou-movie.com`（作品専用サイトはそのまま） |
+
+対応表は Sony Pictures・Warner Bros.・Disney・Marvel・20th Century Studios・
+Universal・Paramount の7社です（`STUDIO_JP`）。
+
+差し替えるのは**海外スタジオの公式ページだったときだけ**です。
+「日本の配給会社のページなら何でも採る」方式も試しましたが、
+記事には配給会社への無関係なリンクも並ぶため、
+`国宝` がシネマ歌舞伎の別作品のページを拾うなどの誤りが出たので採用していません。
 
 公式サイトはフォームの「公式サイト・参考URL」欄で自由に書き換えられます。
 手入力で追加した作品もここに URL を入れればリンクが付きます（`http` / `https` のみ）。

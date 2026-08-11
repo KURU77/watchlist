@@ -759,6 +759,65 @@ function wpResolve(titles){
   });
 }
 
+/* --- 公式サイトを日本版に寄せる ---
+   Wikidata の「公式ウェブサイト」(P856) は海外スタジオの総合ページを
+   指していることが多い（例：ヴェノム → sonypictures.com）。
+   同じスタジオの日本サイトが Wikipedia の外部リンクにあれば、そちらを使う。
+
+   なお「日本の配給会社のページなら何でも採る」やり方は試したうえで採らなかった。
+   記事には配給会社への関係ないリンクも並ぶため、
+   別作品のページ（国宝 → シネマ歌舞伎の別作品）を拾ってしまう。 */
+var STUDIO_JP = [
+  [/(^|\.)sonypictures(animation)?\.com$/i,   /(^|\.)sonypictures\.jp$/i],
+  [/(^|\.)warnerbros\.com$/i,                 /(^|\.)warnerbros\.co\.jp$/i],
+  [/(^|\.)disney\.com$/i,                     /(^|\.)disney\.co\.jp$/i],
+  [/(^|\.)marvel\.com$/i,                     /(^|\.)(marvel\.)?disney\.co\.jp$/i],
+  [/(^|\.)20thcenturystudios\.com$/i,         /(^|\.)disney\.co\.jp$/i],
+  [/(^|\.)(universalpictures|uphe)\.com$/i,   /(^|\.)(uphe|universalpictures)\.jp$/i],
+  [/(^|\.)paramountmovies\.com$/i,            /(^|\.)paramount\.jp$/i]
+];
+// 会社案内・プレスリリースなどは作品の公式ページではない
+var PATH_DENY = /^\/(corp|company|press|news|ir|recruit|privacy|support|contact|sitemap|inquiry)(\/|$)/i;
+
+function jaCounterpart(currentHost, urls){
+  for(var i=0;i<STUDIO_JP.length;i++){
+    if(!STUDIO_JP[i][0].test(currentHost)) continue;
+    var want=STUDIO_JP[i][1];
+    for(var k=0;k<urls.length;k++){
+      var a;
+      try{ a=new URL(urls[k]); }catch(e){ continue; }
+      if(a.protocol!=='http:' && a.protocol!=='https:') continue;
+      var h=a.hostname.replace(/^www\./,'');
+      if(want.test(h) && !PATH_DENY.test(a.pathname)) return a.href;
+    }
+  }
+  return '';
+}
+function wpExtLinks(title){
+  var u = WP_API+'?action=query&redirects=1&prop=extlinks&ellimit=max&titles='+
+          encodeURIComponent(title)+'&format=json&formatversion=2&origin=*';
+  return jsonp(u).then(function(j){
+    var pages=(j.query&&j.query.pages)||[];
+    var links=[];
+    pages.forEach(function(p){
+      (p.extlinks||[]).forEach(function(x){
+        var v=(typeof x==='string') ? x : (x.url||x['*']);
+        if(v) links.push(v);
+      });
+    });
+    return links;
+  }).catch(function(){ return []; });
+}
+/* 海外スタジオの公式ページのときだけ、同じスタジオの日本サイトに差し替える。
+   作品専用サイト（kokuhou-movie.com など）はそのまま残す。 */
+function betterOfficial(current, urls){
+  if(!current) return '';
+  var h;
+  try{ h=new URL(current).hostname.replace(/^www\./,''); }catch(e){ return current; }
+  if(/\.jp$/i.test(h)) return current;           // すでに日本のサイト
+  return jaCounterpart(h, urls) || current;
+}
+
 /* Q番号でまとめて中身を取り、結果に組み立てる。
    strict=false（URL を貼られたとき）は種類の判定に通らなくても返す */
 function wdEnrich(pages, strict){
@@ -896,6 +955,7 @@ function buildWikiResult(page, e, strict){
     return {
       src:'wikidata', srcLabel:'Wikipedia', id:(e && e.id) || page.title,
       title: label,
+      wpTitle: page.title,
       official: snakStr(c,'P856'), links: streams,
       cat: cat,
       format: isFilm ? 'MOVIE' : 'TV',
@@ -1088,6 +1148,16 @@ function applyResult(r, btn){
     if(r.seasons) $('f-seasons').value=Math.round(r.seasons);
     var need=(r.directorIds||[]).slice(0,2).concat((r.networkIds||[]).slice(0,2));
     setStatus('「'+r.title+'」を読み込みました。');
+    // 公式サイトが海外スタジオのページなら、日本版に差し替える
+    if(r.wpTitle && r.official && !/\.jp$/i.test((r.official.split('/')[2]||''))){
+      wpExtLinks(r.wpTitle).then(function(links){
+        var jp=betterOfficial(r.official, links);
+        if(jp && jp!==$('f-official').value && !editingId){
+          $('f-official').value=jp;
+          renderLinkPreview();
+        }
+      });
+    }
     wdLabels(need).then(function(map){
       var dirs=(r.directorIds||[]).slice(0,2).map(function(i){ return map[i]; }).filter(Boolean);
       var nets=(r.networkIds||[]).slice(0,2).map(function(i){ return map[i]; }).filter(Boolean);
