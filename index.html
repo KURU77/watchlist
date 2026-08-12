@@ -251,6 +251,31 @@
   </div>
 </details>
 
+<details class="help" id="notifyPanel" hidden>
+  <summary>🔔 公開日・放送日を通知する</summary>
+  <div class="help-body">
+    <p class="h-note" style="margin-top:8px">
+      「放送予定」に入れた作品の公開日・放送日が近づいたら、端末にお知らせします。<br>
+      日付を入れていない作品と、「いつか見たい」「見た」に入れた作品は対象外です。
+    </p>
+    <label class="svc-pick" id="notifyToggle" style="margin:2px 0 10px">
+      <input type="checkbox" id="n-on"><span class="tick">☐</span> 通知する
+    </label>
+    <div class="row" id="notifyOpts">
+      <div class="field"><label for="n-days">いつ知らせる</label>
+        <select id="n-days">
+          <option value="0">当日</option>
+          <option value="1">前日</option>
+          <option value="3">3日前</option>
+          <option value="7">1週間前</option>
+        </select></div>
+      <div class="field"><label for="n-time">知らせる時刻</label>
+        <input type="time" id="n-time" value="20:00"></div>
+    </div>
+    <p class="h-note" id="notifyStatus"></p>
+  </div>
+</details>
+
 <!-- ============ 取り込み ============ -->
 <section class="import">
   <h2>🔎 データを取り込む</h2>
@@ -453,6 +478,7 @@ function load(){
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(items)); }
   catch(e){ alert('保存できませんでした（ブラウザの保存領域が満杯かもしれません）'); }
+  syncNotifications();          // 作品が変わったら通知の予約も取り直す
 }
 
 /* ---- 使っている配信サービス ---- */
@@ -513,9 +539,12 @@ function cardLinks(it){
 
 /* ================= 日付 ================= */
 function today0(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
-function todayStr(){
-  var d=new Date();
+function ymd(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function todayStr(){ return ymd(new Date()); }
+function hhmm(d){
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
 function parseDate(s){
   if(!s) return null;
@@ -1617,6 +1646,132 @@ $('fileInput').addEventListener('change', function(e){
   r.readAsText(f);
 });
 
+/* ================= 公開日・放送日の通知（アプリ版のみ） =================
+   「放送予定」に入っていて日付のある作品について、指定した日数前の
+   指定時刻に端末へ通知を出す。予約はアプリ側（OS）が持つので、
+   アプリを開いていなくても届く。
+   Web 版はブラウザの制約で「閉じていても届く通知」を出せないため、
+   この欄自体を表示しない。                                          */
+var NKEY='watchlist.notify.v1';
+var notify=(function(){
+  try{
+    var o=JSON.parse(localStorage.getItem(NKEY)||'null');
+    if(o && typeof o==='object') return {on:!!o.on, days:(+o.days||0), time:o.time||'20:00'};
+  }catch(e){}
+  return {on:false, days:1, time:'20:00'};
+})();
+function saveNotify(){
+  try{ localStorage.setItem(NKEY, JSON.stringify(notify)); }catch(e){}
+}
+function LN(){
+  return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+}
+// 作品の id から、通知の番号（正の整数）を毎回同じになるように作る
+function notifId(id){
+  var h=0;
+  for(var i=0;i<String(id).length;i++){ h=(h*31+String(id).charCodeAt(i))|0; }
+  return Math.abs(h)%2000000000+1;
+}
+function plannedNotifications(now){
+  now = now || Date.now();
+  var out=[];
+  if(!notify || !notify.on) return out;
+  var hm=String(notify.time||'20:00').split(':');
+  items.forEach(function(it){
+    if(it.status!=='sched' || !it.date) return;
+    var d=parseDate(it.date);
+    if(!d) return;
+    var at=new Date(d.getTime()-(+notify.days||0)*86400000);
+    at.setHours(+hm[0]||0, +hm[1]||0, 0, 0);
+    if(at.getTime()<=now) return;              // すでに過ぎている分は出さない
+    out.push({id:notifId(it.id), at:at, it:it});
+  });
+  out.sort(function(a,b){ return a.at-b.at; });
+  return out.slice(0,60);                      // 端末の予約数の上限に配慮
+}
+function notifyText(p){
+  var it=p.it;
+  var word=(it.cat==='movie') ? '公開' : '放送';
+  var d=+notify.days;
+  var when=(d===0) ? 'は今日' : ((d===1) ? 'は明日' : ('まであと'+d+'日'));
+  return {
+    title:'『'+it.title+'』'+when+word,
+    body:[fmtDate(it.date,true), it.time||'', it.ch||''].filter(Boolean).join('　')
+  };
+}
+function updateNotifyUI(){
+  if(!$('notifyPanel')) return;
+  $('n-on').checked=!!notify.on;
+  $('notifyToggle').classList.toggle('on', !!notify.on);
+  $('notifyToggle').querySelector('.tick').textContent = notify.on ? '☑' : '☐';
+  $('n-days').value=String(notify.days);
+  $('n-time').value=notify.time;
+  $('notifyOpts').style.display = notify.on ? '' : 'none';
+  if(!notify.on){ $('notifyStatus').textContent=''; return; }
+  var plan=plannedNotifications();
+  $('notifyStatus').textContent = plan.length
+    ? plan.length+'件を予約しています。いちばん近いのは「'+plan[0].it.title+'」（'+
+      fmtDate(ymd(plan[0].at), true)+' '+hhmm(plan[0].at)+'）。'
+    : '日付の入った「放送予定」の作品がないため、予約はありません。';
+}
+var notifyTimer=null;
+function syncNotifications(){
+  updateNotifyUI();
+  var ln=LN();
+  if(!ln) return;
+  clearTimeout(notifyTimer);                   // 続けて変更されたときは最後の1回だけ
+  notifyTimer=setTimeout(function(){
+    ln.getPending().then(function(p){
+      var list=(p&&p.notifications)||[];
+      return list.length
+        ? ln.cancel({notifications:list.map(function(n){ return {id:n.id}; })})
+        : null;
+    }).then(function(){
+      var plan=plannedNotifications();
+      if(!plan.length) return null;
+      return ln.schedule({notifications: plan.map(function(p){
+        var t=notifyText(p);
+        return {
+          id:p.id, title:t.title, body:t.body,
+          schedule:{at:p.at, allowWhileIdle:true},
+          smallIcon:'ic_stat_watchlist', iconColor:'#3b62d8'
+        };
+      })});
+    }).catch(function(){ /* 通知が使えなくても本体は動かす */ });
+  }, 300);
+}
+if($('notifyPanel')){
+  $('n-on').addEventListener('change', function(){
+    if(!$('n-on').checked){
+      notify.on=false; saveNotify(); syncNotifications(); return;
+    }
+    var ln=LN();
+    if(!ln){                                    // Web 版では使えない
+      notify.on=false; $('n-on').checked=false; updateNotifyUI();
+      $('notifyStatus').textContent='この機能はアプリ版でのみ使えます。';
+      return;
+    }
+    ln.checkPermissions().then(function(p){
+      return (p && p.display==='granted') ? p : ln.requestPermissions();
+    }).then(function(p){
+      if(p && p.display==='granted'){
+        notify.on=true; saveNotify(); syncNotifications();
+      }else{
+        notify.on=false; $('n-on').checked=false; saveNotify(); updateNotifyUI();
+        $('notifyStatus').textContent='端末の設定で、このアプリの通知が許可されていません。';
+      }
+    }).catch(function(){
+      notify.on=false; $('n-on').checked=false; saveNotify(); updateNotifyUI();
+    });
+  });
+  $('n-days').addEventListener('change', function(){
+    notify.days=+$('n-days').value||0; saveNotify(); syncNotifications();
+  });
+  $('n-time').addEventListener('change', function(){
+    notify.time=$('n-time').value||'20:00'; saveNotify(); syncNotifications();
+  });
+}
+
 /* ================= アプリ版（Capacitor）のための調整 ================= */
 var IS_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform &&
                    window.Capacitor.isNativePlatform());
@@ -1640,6 +1795,17 @@ if(IS_NATIVE){
   if(guide){
     guide.removeAttribute('download');
     guide.setAttribute('href', SITE+encodeURIComponent('視聴リスト_使い方ガイド.pdf'));
+  }
+
+  // 通知はアプリ版でのみ使えるので、この欄もアプリ版でだけ出す
+  if($('notifyPanel')){
+    $('notifyPanel').hidden=false;
+    syncNotifications();
+  }
+  // アプリに戻ってきたら予約を取り直す（日付が変わっている場合があるため）
+  var A=window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if(A && A.addListener){
+    A.addListener('resume', function(){ syncNotifications(); });
   }
 }
 
