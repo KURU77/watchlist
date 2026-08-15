@@ -59,6 +59,13 @@
   .btn.danger:hover{border-color:var(--danger);color:var(--danger)}
   .btn[disabled]{opacity:.5;cursor:default;pointer-events:none}
 
+  /* ---- オフラインの知らせ ---- */
+  #offlineBar{
+    background:#fdf4ef;border:1px solid #f0d3c2;border-left:4px solid var(--warn);
+    border-radius:0 10px 10px 0;padding:9px 13px;margin-bottom:12px;
+    font-size:12.5px;color:#7a3a17;
+  }
+
   /* ---- 取り込みバー ---- */
   .import{
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
@@ -235,6 +242,10 @@
     <input type="file" id="fileInput" accept="application/json" hidden>
   </div>
 </header>
+
+<div id="offlineBar" hidden>
+  📴 オフラインです。保存済みのリストはそのまま使えますが、作品の取り込みだけはできません。
+</div>
 
 <details class="help" id="svcPanel">
   <summary>▶ 使っている配信サービスを選ぶ</summary>
@@ -746,8 +757,9 @@ function jsonp(url){
    本文検索(list=search)だけだと、「国宝」「あんぱん」のような短い題名は
    同じ語を含む別の記事に埋もれてしまう。
    タイトル前方一致(prefixsearch)と、タイトル内検索(intitle:)を先に見る。 */
+// 失敗したときは null を返す（空配列＝0件 と区別して、通信不良を見分けるため）
 function wpList(url, pick){
-  return jsonp(url).then(pick).catch(function(){ return []; });
+  return jsonp(url).then(pick).catch(function(){ return null; });
 }
 function wpFindTitles(term){
   var q = encodeURIComponent(term);
@@ -765,9 +777,11 @@ function wpFindTitles(term){
            '&srlimit=8&srnamespace=0&format=json&origin=*',
            function(j){ return ((j.query&&j.query.search)||[]).map(function(x){ return x.title; }); })
   ]).then(function(lists){
+    // 3つとも失敗したときは「0件」ではなく通信不良として扱う
+    if(lists.every(function(l){ return l===null; })) throw new Error('通信できませんでした');
     var seen={}, out=[];
     lists.forEach(function(l){
-      l.forEach(function(t){
+      (l||[]).forEach(function(t){
         if(!t || seen[t] || /一覧$|の登場人物|エピソード一覧/.test(t)) return;
         seen[t]=1; out.push(t);
       });
@@ -778,7 +792,7 @@ function wpFindTitles(term){
 
 /* 記事タイトル → Wikidata の Q番号と冒頭文（リダイレクトもたどる） */
 function wpResolve(titles){
-  if(!titles.length) return Promise.resolve([]);
+  if(!titles || !titles.length) return Promise.resolve([]);
   var u = WP_API+'?action=query&redirects=1&prop=pageprops|extracts'+
           '&exintro=1&explaintext=1&exchars=320&exlimit=max'+
           '&titles='+encodeURIComponent(titles.join('|'))+
@@ -1021,7 +1035,11 @@ function wikiSearch(term){
     return wpList(WP_API+'?action=query&list=search&srsearch='+encodeURIComponent(term+' 映画')+
                   '&srlimit=8&srnamespace=0&format=json&origin=*',
                   function(j){ return ((j.query&&j.query.search)||[]).map(function(x){ return x.title; }); })
-      .then(wpResolve).then(function(pages){ return wdEnrich(pages, true); });
+      .then(function(titles){
+        if(titles===null) throw new Error('通信できませんでした');   // 0件ではなく通信不良
+        return wpResolve(titles);
+      })
+      .then(function(pages){ return wdEnrich(pages, true); });
   });
 }
 /* ja.wikipedia の URL を貼られたとき（種類の判定に通らなくても取り込む） */
@@ -1094,9 +1112,13 @@ function runImport(){
     p=wikiSearch(term);
   }else{
     p=Promise.all([
-      alSearch(term).catch(function(){ return []; }),
-      wikiSearch(term).catch(function(){ return []; })
-    ]).then(function(a){ return a[0].concat(a[1]); });
+      alSearch(term).catch(function(){ return null; }),
+      wikiSearch(term).catch(function(){ return null; })
+    ]).then(function(a){
+      // 両方とも失敗したなら通信不良。片方でも返っていれば結果として扱う
+      if(a[0]===null && a[1]===null) throw new Error('通信できませんでした');
+      return (a[0]||[]).concat(a[1]||[]);
+    });
   }
 
   p.then(function(res){
@@ -1109,7 +1131,9 @@ function runImport(){
     showResults(res);
   }).catch(function(err){
     $('imp-go').disabled=false;
-    setStatus('取り込みに失敗しました（'+(err.message||err)+'）。オフラインの可能性があります。', true);
+    setStatus(navigator.onLine===false
+      ? 'オフラインのため取り込めません。通信できるようになってから、もう一度お試しください。'
+      : '取り込みに失敗しました（'+(err.message||err)+'）。通信の状態をご確認ください。', true);
   });
 }
 
@@ -1808,6 +1832,24 @@ if(IS_NATIVE){
     A.addListener('resume', function(){ syncNotifications(); });
   }
 }
+
+/* ================= オフライン対応 ================= */
+// 画面と画像を端末に保存しておき、通信がなくても開けるようにする。
+// file:// で開いたときとアプリ版では使えない（使う必要もない）ので入れない。
+if('serviceWorker' in navigator && !window.Capacitor &&
+   (location.protocol==='https:' || location.hostname==='localhost')){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+// つながっていないことを画面の上に出す
+function showOfflineBar(off){
+  var bar=$('offlineBar');
+  if(bar) bar.hidden = !off;
+}
+window.addEventListener('offline', function(){ showOfflineBar(true); });
+window.addEventListener('online',  function(){ showOfflineBar(false); });
+showOfflineBar(navigator.onLine===false);
 
 /* ================= 起動 ================= */
 renderSvcPicker();
